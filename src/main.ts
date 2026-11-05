@@ -1,10 +1,10 @@
 import './styles/tokens.css';
 import { render } from 'lit';
 import { html } from 'lit';
-import './app';
+import './components/exam-shell.js';
 
 const app = document.querySelector<HTMLElement>('#app');
 
 if (app) {
-  render(html`<tartanleaf-app></tartanleaf-app>`, app);
+  render(html`<exam-shell></exam-shell>`, app);
 }
