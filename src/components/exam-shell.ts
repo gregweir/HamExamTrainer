@@ -63,7 +63,7 @@ export class ExamShell extends LitElement {
     const questions = bankData[bank.id] ?? [];
     const sectionOf = new Map<string, string>(questions.map(q => [contentIdentityFromQuestion(q), q.section]));
     const totals = new Map<string, SectionStat>(
-      bank.sections.map(id => [id, { id, total: questions.filter(q => q.section === id).length, studied: 0, correct: 0 }]),
+      bank.sections.map(id => [id, { id, title: sectionTitle(bank.id, id), total: questions.filter(q => q.section === id).length, studied: 0, correct: 0 }]),
     );
     const records = await this.progress.bankRecords(bank.id);
     for (const r of records) {
@@ -285,7 +285,17 @@ export class ExamShell extends LitElement {
     if (v.kind === 'practice-pick') {
       // sectionStats load asynchronously from the store — while empty (no
       // data yet) the chapter list renders nothing: never fake zeros.
-      return html`<chapter-list
+      const total = this.bank.questionCount;
+      const seen = [...this.sectionStats.values()].reduce((a, b) => a + b.studied, 0);
+      const readiness = Math.round((seen / total) * 100);
+      return html`
+        <div class="home-head">
+          <div class="ready" role="status">
+            <span class="ready-num">${readiness}%</span>
+            <span class="ready-label">ready · ${seen} of ${total} questions studied</span>
+          </div>
+        </div>
+        <chapter-list
         .sections="${this.sectionStats}"
         @section-start="${(e: CustomEvent) => {
           const section = e.detail.section;
