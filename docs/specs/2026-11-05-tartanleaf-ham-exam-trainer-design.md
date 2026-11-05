@@ -134,3 +134,28 @@ same pipeline (same ids, French text) — v1 includes it if the parse is clean.
   (ca banks figure-free per the research).
 - A 2026 CA Advanced bank swap — pipeline must re-run cleanly.
 - Pool updates (erratas) — the fetch script must stamp its source URL + date.
+
+## Implementation-review resolutions (2026-11-05)
+
+1. **Exam-mode rules :** exam-like — no per-question feedback during a
+   mock exam; verdict (pass/fail + per-section breakdown) at the end; timer
+   optional (the operator sets it; US exams have no official limit, CA time is
+   invigilator-set — the timer shows elapsed and optionally a soft budget);
+   exams are **resumable** (state persisted locally).
+2. **Explanations launch bar (decision recorded 2026-11-05): "progressive drafts"** —
+   the feature ships day one; drafts for US Tech + CA Basic authored into the
+   sidecars and rendered marked *draft*; the owner reviews drafts → `reviewed`.
+   Other classes fill progressively. **French explanations: out of v1** — FR
+   users see the EN annotation marked as EN.
+3. **Progress keys survive re-bases :** user state keys on a stable
+   content identity (`bank + section + normalized question text hash`), with an
+   id-alias map generated per pool version — a 2026 CA Advanced swap or an NCVEC
+   re-base migrates SM-2 state by content, never by fragile id alone.
+4. **Hosting:** published at `radiobook.ca/trainer/`. Operational hosting, routing, and deployment details are maintained outside this repository.
+5. **Offline : lazy per-bank precache** — first install: app shell +
+   the selected bank (US Tech by default) fully precached *including figures*;
+   other banks cache on first open. Every shipped bank remains offline-capable
+   once opened.
+6. **License : MIT** for the repo; Apache-2.0 NOTICE preserved for
+   reused russolsen figure assets; NCVEC public-domain + ISED attribution files
+   accompany the data.
