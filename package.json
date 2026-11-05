@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "pools": "vite-node --script scripts/parse-ca.ts && vite-node --script scripts/parse-us.ts && vite-node --script scripts/validate-pools.ts",
     "validate": "npm run typecheck && npm run build && npm run test"
   },
   "dependencies": {

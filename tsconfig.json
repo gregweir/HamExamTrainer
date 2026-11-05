@@ -8,6 +8,7 @@
     "noUncheckedIndexedAccess": true,
     "useDefineForClassFields": true,
     "experimentalDecorators": true,
+    "resolveJsonModule": true,
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,

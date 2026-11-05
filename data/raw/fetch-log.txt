@@ -1,0 +1,5 @@
+Fetch stamp — 2026-11-05 (UTC)
+  US:          https://github.com/russolsen/ham_radio_question_pool/archive/refs/heads/main.tar.gz
+  CA Basic:    https://apc-cap.ic.gc.ca/datafiles/amat_basic_quest.zip
+  CA Advanced: https://apc-cap.ic.gc.ca/datafiles/amat_adv_quest.zip
+See data/raw/SOURCES.md for the license attribution per source.
