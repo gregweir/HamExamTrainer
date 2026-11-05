@@ -102,7 +102,7 @@ export function parseCaBank(raw: string, bank: 'ca-basic' | 'ca-advanced'): CaEx
       const id = fields[0] ?? line.slice(0, 20);
       throw new Error(
         `${bank} row ${id}: expected ${EXPECTED_FIELDS} ';'-split fields, got ${fields.length}. ` +
-          'Field splitting must stay verbatim; report this to the controller instead of papering over it.',
+          'Field splitting must stay verbatim — fail loudly here; never normalize raw anomalies away silently.',
       );
     }
     const id = fields[0]!;

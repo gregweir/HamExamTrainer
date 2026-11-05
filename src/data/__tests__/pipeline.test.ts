@@ -20,6 +20,7 @@ import {
   type CaExamQuestion,
   type ExamBankId,
   type ExamQuestion,
+  PARKED_BANKS,
   US_TECH,
 } from '../exam-banks';
 
@@ -135,10 +136,24 @@ describe('CA parser — verbatim round-trip over the raw ISED bank', () => {
       expect(s).toMatch(/^B-\d\d\d-\d\d\d$/);
     }
   });
+
+  it('does not degenerate the correct answer into a single display position', () => {
+    const rows = parseCaBank(readRepo(CA_BASIC_RAW_PATH), 'ca-basic');
+    const byPosition: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
+    for (const row of rows) {
+      byPosition[row.correctIndex]! += 1;
+    }
+    // A regression back to identity order would collapse this to {0: 984}.
+    expect(Object.keys(byPosition).filter((p) => byPosition[Number(p)]! > 0)).toHaveLength(4);
+    // And no single position dominates: every position is used a real share.
+    for (const count of Object.values(byPosition)) {
+      expect(count).toBeGreaterThan(10);
+    }
+  });
 });
 
-// Only the two v1 banks are exported by the registry; the parked banks come
-// straight from their emitted JSON files (same parse, same shape).
+// Only the two v1 banks are exported as typed data by the registry; the parked
+// banks come straight from their emitted JSON files (same parse, same shape).
 function emitted(bank: string): ExamQuestion[] {
   return JSON.parse(readRepo(EMITTED_PATHS[bank]!)) as ExamQuestion[];
 }
@@ -242,6 +257,19 @@ describe('emitted bank JSON matches what the parsers produce', () => {
 });
 
 describe('answer-index integrity across every bank', () => {
+  it('every question id is unique within its bank', () => {
+    for (const [bank, questions] of [
+      ['us-tech', US_TECH],
+      ['us-general', emitted('us-general')],
+      ['us-extra', emitted('us-extra')],
+      ['ca-basic', CA_BASIC],
+      ['ca-advanced', emitted('ca-advanced')],
+    ] as Array<[string, ExamQuestion[]]>) {
+      const ids = questions.map((q) => q.id);
+      expect(new Set(ids).size, bank).toBe(ids.length);
+    }
+  });
+
   it('every question has exactly 4 choices and an in-range correctIndex (EN and FR)', () => {
     const all: ExamQuestion[] = [US_TECH, emitted('us-general'), emitted('us-extra'), CA_BASIC].flat();
     expect(all.length).toBe(OFFICIAL_COUNTS['us-tech']! + OFFICIAL_COUNTS['us-general']! +
@@ -259,14 +287,19 @@ describe('answer-index integrity across every bank', () => {
 });
 
 describe('bank registry', () => {
-  it('ships the v1 banks with exact thresholds, counts and section lists', () => {
+  it('ships the v1 banks with exact exam rules, counts and section lists', () => {
     expect(BANKS.map((b) => b.id)).toEqual(['us-tech', 'ca-basic']);
     const tech = BANKS[0]!;
     const basic = BANKS[1]!;
     expect(tech.questionCount).toBe(409);
+    expect(tech.examLength).toBe(35);
     expect(tech.passPercent).toBe(74);
+    expect(tech.honoursPercent).toBeUndefined();
     expect(basic.questionCount).toBe(984);
-    expect(basic.passPercent).toBe(70); // ISED Basic pass mark; Honours bar is 80%.
+    expect(basic.examLength).toBe(100);
+    // Corrected ISED rule: 70% pass, Honours certificate at 80%.
+    expect(basic.passPercent).toBe(70);
+    expect(basic.honoursPercent).toBe(80);
     expect(tech.sections.length).toBe(35);
     expect(basic.sections.length).toBe(new Set(CA_BASIC.map((q) => q.section)).size);
     expect(new Set(tech.sections)).toEqual(new Set(US_TECH.map((q) => q.section)));
@@ -280,6 +313,21 @@ describe('bank registry', () => {
     // Book 3 CTAs per the plan (Tech→Book 3, Basic→Book 3).
     expect(tech.bookCta.href).toBe('https://radiobook.ca/b3');
     expect(basic.bookCta.href).toBe('https://radiobook.ca/b3');
+  });
+
+  it('carries exam rules for the parsed-but-parked banks', () => {
+    expect(PARKED_BANKS.map((b) => b.id)).toEqual(['us-general', 'us-extra', 'ca-advanced']);
+    expect(PARKED_BANKS[0]!.examLength).toBe(35);
+    expect(PARKED_BANKS[0]!.passPercent).toBe(74);
+    expect(PARKED_BANKS[1]!.examLength).toBe(50);
+    expect(PARKED_BANKS[1]!.passPercent).toBe(74);
+    expect(PARKED_BANKS[2]!.examLength).toBe(50);
+    expect(PARKED_BANKS[2]!.passPercent).toBe(70);
+    expect(PARKED_BANKS[2]!.honoursPercent).toBeUndefined();
+    for (const b of PARKED_BANKS) {
+      expect(b.sections.length).toBeGreaterThan(0);
+      expect(BANKS.map((s) => s.id)).not.toContain(b.id);
+    }
   });
 });
 

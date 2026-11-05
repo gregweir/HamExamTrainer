@@ -38,7 +38,7 @@ exam-agnostic from day one).
    resurface; a per-question stability field drives "what's due today".
 3. **Timed practice exams** — the REAL exam rules per element: US = 35 questions,
    74% pass (Tech/General), Extra 50 questions / 74%; CA Basic = 100 questions,
-   80% pass (70% marks Honours eligibility), Advanced = 50 questions / 70%.
+   70% pass (80% marks Honours eligibility), Advanced = 50 questions / 70%.
    The simulator shows the pass/fail verdict against those exact thresholds.
 
 ### Written explanations per question
@@ -93,7 +93,7 @@ interface ExamQuestion {
 }
 ```
 
-**Honours = Basic bank + higher pass bar (80%)** — a rendering rule, not a
+**Honours = Basic bank + the higher Honours bar (80%)** — a rendering rule, not a
 separate bank. Bilingual: CA Basic EN bank v1; the FR bank ships through the
 same pipeline (same ids, French text) — v1 includes it if the parse is clean.
 
@@ -159,3 +159,16 @@ same pipeline (same ids, French text) — v1 includes it if the parse is clean.
 6. **License : MIT** for the repo; Apache-2.0 NOTICE preserved for
    reused russolsen figure assets; NCVEC public-domain + ISED attribution files
    accompany the data.
+
+## Implementation-review addendum (2026-11-05, pool pipeline stage)
+
+- **Canadian pass rules CORRECTED:** Basic = 70% pass, 80% = Honours (an earlier
+  wording inverted these; ISED rules as per the July 2025 bank documents).
+- **Choice ORDER:** the ISED TXT always presents the correct answer first; the
+  pipeline applies a deterministic, id-seeded permutation so the correct answer
+  is not positionally identifiable, EN+FR permuted identically, all strings
+  byte-preserved (round-trip test). Exam mode may reshuffle presentation per
+  attempt.
+- **Bundle/precache note:** banks are statically imported (inlined in JS
+  chunks) — the PWA precaches built chunks; no separate raw-JSON precache copy
+  is needed (Task 8's test asserts chunk precaching).

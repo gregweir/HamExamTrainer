@@ -16,7 +16,7 @@
 - CA bank text ships VERBATIM — never altered, in EN or FR; explanations only via separate annotation sidecars keyed by bank-scoped question id.
 - No ads, no accounts, NO ANALYTICS in v1 (spec anti-goal); all computation local.
 - Progress keys: content-identity (normalized text hash + section), alias map per pool version — never bare fragile ids (resolution 3).
-- Exam thresholds EXACT: US Tech/General 35q/74%, US Extra 50q/74%; CA Basic 100q/80% (70% = Honours-eligible), CA Advanced 50q/70% (resolution 1).
+- Exam thresholds EXACT: US Tech/General 35q/74%, US Extra 50q/74%; CA Basic 100q/70% pass (80% = Honours), CA Advanced 50q/70% (resolution 1).
 - `npm run validate` = typecheck + build + vitest — green at the end of every task.
 - Every task ends with its conventional commit; no attribution trailers.
 
@@ -118,7 +118,7 @@
 
 **Files:**
 - Create: `src/components/exam-session.ts` (start → seeded question sample honoring section distribution; timer elapsed + optional budget; resume after reload via ProgressStore; submit → verdict = percent vs bank.passPercent; per-section breakdown; Honours marker for CA Basic ≥80%)
-- Test: extend progress tests (resume serialization) + a component test (verdict math: 25/35 = 71.4% → fail Tech; 80/100 CA → pass+Honours)
+- Test: extend progress tests (resume serialization) + a component test (verdict math: 25/35 = 71.4% → fail Tech (74 needed); 70/100 CA Basic → pass; 80/100 → Honours)
 
 **Interfaces:** Consumes BANKS thresholds; ProgressStore exam session save/load.
 

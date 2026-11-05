@@ -5,6 +5,6 @@ dist/
 
 
 .worktrees/
-data/raw/ca/basic/tmp-*
+data/raw/**/tmp-*
 *.log
 .DS_Store

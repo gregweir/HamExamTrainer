@@ -1,17 +1,24 @@
 // Validate every parsed bank against the official pool facts before it is
 // allowed to ship:
 //   - question counts vs the official NCVEC / ISED numbers
+//   - unique question ids per bank
 //   - answer-index integrity (4 choices, correctIndex in range, US letter match)
 //   - CA verbatim byte-check (normalized rows rebuild the raw TXT byte-for-byte)
+//   - CA EN/FR correct-answer pairing against the raw fields
 //   - figure integrity (declared figures exist raw + emitted)
-//   - registry consistency (BANKS counts/sections match the emitted data)
+//   - registry consistency (BANKS + PARKED_BANKS counts/sections match the data)
 //
-// CLI usage:  npx vite-node scripts/validate-pools.ts   (exit 1 on any error)
+// CLI usage:  npx vite-node --script scripts/validate-pools.ts   (exit 1 on any error)
 
 import { Buffer } from 'node:buffer';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BANKS, type CaExamQuestion, type ExamQuestion, US_TECH } from '../src/data/exam-banks';
+import {
+  BANKS,
+  type CaExamQuestion,
+  type ExamQuestion,
+  PARKED_BANKS,
+} from '../src/data/exam-banks';
 import {
   caRawLine,
   CAAuthoritativeSources,
@@ -37,6 +44,21 @@ function emitBankPath(bank: string): string {
   return join('src', 'data', 'banks', `${bank}.json`);
 }
 
+function emitBank<T>(bank: string): T {
+  return JSON.parse(readFileSync(emitBankPath(bank), 'utf8')) as T;
+}
+
+/** Question ids must be unique within a bank — progress records key on them. */
+function checkUniqueId(bank: string, questions: ExamQuestion[], errors: string[]): void {
+  const seen = new Set<string>();
+  for (const q of questions) {
+    if (seen.has(q.id)) {
+      errors.push(`${bank}: duplicate question id ${q.id}`);
+    }
+    seen.add(q.id);
+  }
+}
+
 export function validatePools(): PoolValidationReport {
   const errors: string[] = [];
   const counts: Array<{ bank: string; questions: number }> = [];
@@ -59,8 +81,10 @@ export function validatePools(): PoolValidationReport {
         errors.push(`${q.bank} ${q.id}: figure ${q.figure} not found under public/`);
       }
     }
+    checkUniqueId(source.bank, parsed, errors);
     // The emitted file must equal a fresh parse.
-    const emitted = JSON.parse(readFileSync(emitBankPath(source.bank), 'utf8')) as ExamQuestion[];
+    const emitted = emitBank<ExamQuestion[]>(source.bank);
+    checkUniqueId(source.bank, emitted, errors);
     if (JSON.stringify(emitted) !== JSON.stringify(parsed)) {
       errors.push(`${source.bank}: emitted JSON differs from a fresh parse of data/raw`);
     }
@@ -85,29 +109,58 @@ export function validatePools(): PoolValidationReport {
       errors.push(`${source.bank}: verbatim round-trip FAILED — normalized rows do not rebuild`);
     }
     for (const q of parsed) {
-      const indexes = [q.correctIndex, q.correctIndex_fr];
       if (q.choices.length !== 4 || q.choices_fr.length !== 4) {
         errors.push(`${q.bank} ${q.id}: choice count != 4`);
       }
-      for (const i of indexes) {
+      for (const i of [q.correctIndex, q.correctIndex_fr]) {
         if (i < 0 || i > 3) {
           errors.push(`${q.bank} ${q.id}: answer-index out of range`);
         }
       }
-      if (q.choices[q.correctIndex] !== q.choices[q.correctIndex_fr]) {
-        errors.push(`${q.bank} ${q.id}: EN and FR correct answers disagree`);
+    }
+    checkUniqueId(source.bank, parsed, errors);
+    // EN/FR pairing, checked against the RAW fields (independent of the parser):
+    // the EN correct string must sit at the emitted correctIndex and the FR
+    // correct string at correctIndex_fr — the same display position for both
+    // languages. Fires if the EN and FR arrays ever get divergent permutations.
+    const emitted = emitBank<CaExamQuestion[]>(source.bank);
+    checkUniqueId(source.bank, emitted, errors);
+    const dataLines = raw
+      .slice(0, raw.endsWith('\r\n') ? -2 : undefined)
+      .split('\r\n')
+      .slice(1)
+      .filter((line) => line.trim() !== '');
+    if (emitted.length !== dataLines.length) {
+      errors.push(`${source.bank}: emitted row count != raw row count`);
+    }
+    for (let i = 0; i < Math.min(emitted.length, dataLines.length); i += 1) {
+      const fields = dataLines[i]!.split(';');
+      const q = emitted[i]!;
+      if (q.choices[q.correctIndex] !== fields[2]) {
+        errors.push(`${q.bank} ${q.id}: EN correct answer does not pair with its raw field`);
+      }
+      if (q.choices_fr[q.correctIndex_fr] !== fields[7]) {
+        errors.push(`${q.bank} ${q.id}: FR correct answer does not pair with its raw field`);
+      }
+      if (q.correctIndex !== q.correctIndex_fr) {
+        errors.push(`${q.bank} ${q.id}: EN and FR correct answers sit at different display positions`);
       }
     }
-    const emitted = JSON.parse(readFileSync(emitBankPath(source.bank), 'utf8')) as CaExamQuestion[];
     if (JSON.stringify(emitted) !== JSON.stringify(parsed)) {
       errors.push(`${source.bank}: emitted JSON differs from a fresh parse of data/raw`);
     }
   }
 
   // --- Registry consistency ------------------------------------------------
-  for (const bank of BANKS) {
-    const data: ExamQuestion[] =
-      bank.id === 'us-tech' ? US_TECH : JSON.parse(readFileSync(emitBankPath(bank.id), 'utf8'));
+  const bankData: Record<string, ExamQuestion[]> = {
+    'us-tech': emitBank<ExamQuestion[]>('us-tech'),
+    'us-general': emitBank<ExamQuestion[]>('us-general'),
+    'us-extra': emitBank<ExamQuestion[]>('us-extra'),
+    'ca-basic': emitBank<CaExamQuestion[]>('ca-basic'),
+    'ca-advanced': emitBank<CaExamQuestion[]>('ca-advanced'),
+  };
+  for (const bank of [...BANKS, ...PARKED_BANKS]) {
+    const data = bankData[bank.id]!;
     if (data.length !== bank.questionCount) {
       errors.push(`registry ${bank.id}: questionCount ${bank.questionCount} != data ${data.length}`);
     }
@@ -117,6 +170,9 @@ export function validatePools(): PoolValidationReport {
     }
     if (data.some((q) => q.bank !== bank.id)) {
       errors.push(`registry ${bank.id}: rows tagged with foreign bank ids`);
+    }
+    if (bank.examLength > bank.questionCount) {
+      errors.push(`registry ${bank.id}: examLength ${bank.examLength} exceeds ${bank.questionCount}`);
     }
   }
 
