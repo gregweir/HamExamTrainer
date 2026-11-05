@@ -1,5 +1,6 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { getLang, onLangChange, t } from '../lib/i18n.js';
 
 /**
  * The "read more" surface: a plain, ungated link to the matching RadioBook
@@ -9,9 +10,13 @@ import { customElement, property } from 'lit/decorators.js';
 @customElement('book-cta')
 export class BookCta extends LitElement {
   @property({ type: String }) bookHref: string | null = null;
-  @property({ type: String }) bookLabel = 'Read more in the RadioBook series';
+  @property({ type: String }) bookLabel: string | null = null;
   @property({ type: String }) practiceHref: string | null = null;
-  @property({ type: String }) practiceLabel = 'Practice this in the game suite';
+  @property({ type: String }) practiceLabel: string | null = null;
+  /** Localize when the host does not hand an explicit label. */
+  private get effectiveBookLabel(): string {
+    return this.bookLabel ?? t('read.more');
+  }
 
   static styles = css`
     :host {
@@ -49,7 +54,7 @@ export class BookCta extends LitElement {
   protected render() {
     return html`
       <span class="brand">Tartanleaf</span>
-      ${this.bookHref ? html`<a href="${this.bookHref}" target="_blank" rel="noopener">${this.bookLabel}</a>` : nothing}
+      ${this.bookHref ? html`<a href="${this.bookHref}" target="_blank" rel="noopener">${this.effectiveBookLabel}</a>` : nothing}
       ${this.practiceHref ? html`<a href="${this.practiceHref}">${this.practiceLabel}</a>` : nothing}
     `;
   }

@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import type { ExamQuestion } from '../data/exam-banks.js';
+import { localizeQuestion, type ExamQuestion } from '../data/exam-banks.js';
+import { getLang, onLangChange, t, type Lang } from '../lib/i18n.js';
 import { inFormControl, onWindowKey } from '../lib/keys.js';
 
 /**
@@ -24,7 +25,9 @@ export class QuestionCard extends LitElement {
 
   @state() private pickedIndex: number | null = null;
   @state() private advanceRequested = false;
+  @state() private uiLang: Lang = getLang();
   private keyOff: (() => void) | null = null;
+  private unsubLang?: () => void;
 
   static styles = css`
     :host {
@@ -185,6 +188,7 @@ export class QuestionCard extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
+    this.unsubLang = onLangChange(() => { this.uiLang = getLang(); });
     // Keyboard (global, this is the only live question card): 1-4 or A-D
     // pick a choice, Enter advances (after answering). Form-control guard
     // keeps typing in the chooser and friends from driving the card.
@@ -205,13 +209,17 @@ export class QuestionCard extends LitElement {
   }
 
   disconnectedCallback(): void {
+    this.unsubLang?.();
+    this.unsubLang = undefined;
     this.keyOff?.();
     this.keyOff = null;
     super.disconnectedCallback();
   }
 
   protected render() {
-    const q = this.question;
+    // French UI: ISED's bilingual rows (same permutation) drive the text;
+    // US questions stay canonical English. Answer math is language-invariant.
+    const q = this.question ? localizeQuestion(this.question, this.uiLang) : null;
     if (!q) return nothing;
     const answered = this.pickedIndex !== null;
     const isRight = answered && this.pickedIndex === q.correctIndex;
@@ -219,8 +227,8 @@ export class QuestionCard extends LitElement {
     return html`
       <div class="section-tag">${q.section}</div>
       <div class="question-text" role="heading" aria-level="2">${q.question}</div>
-      ${q.figure ? html`<img class="study-figure" src="${q.figure}" alt="Exam question diagram for ${q.id}">` : nothing}
-      <div class="choices" role="group" aria-label="Answer choices">
+      ${q.figure ? html`<img class="study-figure" src="${q.figure}" alt="${t('q.figureAlt', { id: q.id })}">` : nothing}
+      <div class="choices" role="group" aria-label="${t('q.choicesAria')}">
         ${q.choices.map((choice, i) => {
           const isPicked = answered && this.pickedIndex === i;
           const revealRight = answered && !this.examMode && i === q.correctIndex;
@@ -243,21 +251,21 @@ export class QuestionCard extends LitElement {
         })}
       </div>
       ${answered && this.examMode ? html`
-        <div class="feedback" role="status">Answer recorded — the verdict comes at the end of the exam.</div>
+        <div class="feedback" role="status">${t('q.answered')}</div>
       ` : nothing}
       ${answered && !this.examMode ? html`
         <div class="feedback ${isRight ? 'correct' : 'incorrect'}" role="status">
-          ${isRight ? 'Correct.' : 'Not quite — the highlighted answer is correct.'}
+          ${isRight ? t('q.correct') : t('q.incorrect')}
           ${q.explanation ? html`
             <div class="explanation">
               ${q.explanation}
-              ${q.explanationStatus === 'draft' ? html`<span class="draft-badge">draft</span>` : nothing}
+              ${q.explanationStatus === 'draft' ? html`<span class="draft-badge">${t('q.draft')}</span>` : nothing}
             </div>
           ` : nothing}
-          ${q.references.length ? html`<div class="refs">Reference: ${q.references.join(', ')}</div>` : nothing}
+          ${q.references.length ? html`<div class="refs">${t('q.refs', { refs: q.references.join(', ') })}</div>` : nothing}
         </div>
         ${this.advanceRequested || this.hideNext ? nothing : html`
-          <button class="next" ?disabled="${this.nextDisabled}" @click="${() => this.requestNext()}">Next question →</button>
+          <button class="next" ?disabled="${this.nextDisabled}" @click="${() => this.requestNext()}">${t('q.next')}</button>
         `}
       ` : nothing}
     `;

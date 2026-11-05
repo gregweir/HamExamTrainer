@@ -12,6 +12,7 @@ import {
 } from '../data/exam-banks.js';
 import type { ProgressStore, ExamSession as StoredSession, ExamAttempt } from '../lib/progress.js';
 import { contentIdentityFromQuestion } from '../lib/ident.js';
+import { getLang, onLangChange, t, type Lang } from '../lib/i18n.js';
 import { inFormControl, onWindowKey } from '../lib/keys.js';
 import './question-card.js';
 
@@ -56,6 +57,9 @@ export class ExamSession extends LitElement {
   @state() submitted = false;
   @state() started = false;
   @state() attempts: ExamAttempt[] = [];
+  @state() private uiLang: Lang = getLang();
+  private keyOff: (() => void) | null = null;
+  private unsubLang?: () => void;
 
   static styles = css`
     :host {
@@ -269,10 +273,14 @@ export class ExamSession extends LitElement {
 
   private identityOf = identityOf;
 
-  private keyOff: (() => void) | null = null;
+  private get bankDisplay(): { title: string } {
+    const b = this.bank!;
+    return this.uiLang === 'fr' ? { title: b.titleFr ?? b.title } : { title: b.title };
+  }
 
   connectedCallback(): void {
     super.connectedCallback();
+    this.unsubLang = onLangChange(() => { this.uiLang = getLang(); });
     // while this exam runs, the arrow keys step through the paper
     this.keyOff = onWindowKey((ke) => {
       if (inFormControl(ke) || !this.started || this.submitted || !this.session) return;
@@ -377,22 +385,20 @@ export class ExamSession extends LitElement {
     // anything unanswered grades as incorrect.
     const unanswered = s.answers.filter(a => a === null).length;
     if (unanswered > 0) {
-      const proceed = window.confirm(
-        `Submit with ${unanswered} unanswered? Unanswered questions count as incorrect.`,
-      );
+      const proceed = window.confirm(t('exam.confirmSubmit', { n: unanswered }));
       if (!proceed) return;
     }
     // archive the verdict before the session is cleared
-    const t = this.tally();
+    const tl = this.tally();
     await this.store?.saveExamAttempt({
-      id: t.startedAt,
+      id: tl.startedAt,
       bank: s.bank,
       submittedAt: Date.now(),
-      correct: t.right,
-      total: t.total,
-      percent: t.v.percent,
-      passed: t.v.passed,
-      honours: t.v.honours || undefined,
+      correct: tl.right,
+      total: tl.total,
+      percent: tl.v.percent,
+      passed: tl.v.passed,
+      honours: tl.v.honours || undefined,
     });
     await this.store?.clearExamSession(s.bank);
     this.submitted = true;
@@ -441,20 +447,20 @@ export class ExamSession extends LitElement {
     if (!this.bank) return nothing;
     if (this.submitted && this.session) return this.renderVerdict();
     if (!this.started) {
+      const honours = this.bank.honoursPercent ?? null;
       return html`
         <div class="intro">
-          <h2>Practice exam — ${this.bank.title}</h2>
+          <h2>${t('exam.title', { b: this.bankDisplay.title })}</h2>
           <p>
-            ${this.bank.examLength} questions drawn across the bank's topics. No
-            feedback until the end — you get the same verdict the real exam gives:
-            ${this.bank.passPercent}% to pass${this.bank.honoursPercent ? `, ${this.bank.honoursPercent}% for Honours` : ''}.
-            You can leave and resume any time — answers are kept locally.
+            ${t('exam.introBody', { n: this.bank.examLength })}
+            ${t('exam.introVerdict', { p: this.bank.passPercent })}${honours !== null ? t('exam.andHonours', { p: honours }) : ''}.
+            ${t('exam.introResume')}
           </p>
-          <button class="primary" @click="${() => void this.startExam()}">Start the exam</button>
+          <button class="primary" @click="${() => void this.startExam()}">${t('exam.start')}</button>
         </div>
         ${this.attempts.length ? html`
           <div class="history">
-            <h3>Previous attempts</h3>
+            <h3>${t('exam.prevAttempts')}</h3>
             <ul>
               ${this.attempts.map(a => html`
                 <li>
@@ -477,9 +483,9 @@ export class ExamSession extends LitElement {
     const q = this.currentQuestion();
     return html`
       <div class="bar">
-        <span>Question ${s.position + 1} / ${s.questionIdentities.length}</span>
-        <span>${answeredCount} answered · ${ExamSession.elapsed(s.startedAt)}</span>
-        <button class="primary" @click="${() => void this.submit()}">Submit exam</button>
+        <span>${t('exam.questionN', { i: s.position + 1, n: s.questionIdentities.length })}</span>
+        <span>${t('exam.answeredOf', { a: answeredCount, t: ExamSession.elapsed(s.startedAt) })}</span>
+        <button class="primary" @click="${() => void this.submit()}">${t('exam.submit')}</button>
       </div>
       ${q ? html`
         <question-card
@@ -488,30 +494,30 @@ export class ExamSession extends LitElement {
           @answered="${(e: CustomEvent) => void this.answer(e.detail.choiceIndex as number)}"
         ></question-card>
         <div class="bar">
-          <button class="primary" ?disabled="${s.position === 0}" @click="${() => void this.moveTo(s.position - 1)}">← Previous</button>
-          <button class="primary" @click="${() => void this.abandon()}">Abandon</button>
+          <button class="primary" ?disabled="${s.position === 0}" @click="${() => void this.moveTo(s.position - 1)}">${t('exam.previous')}</button>
+          <button class="primary" @click="${() => void this.abandon()}">${t('exam.abandon')}</button>
         </div>
-      ` : html`<div class="bar">This question left the bank. <button class="primary" @click="${() => void this.abandon()}">Abandon</button></div>`}
+      ` : html`<div class="bar">${t('exam.goneShort')} <button class="primary" @click="${() => void this.abandon()}">${t('exam.abandon')}</button></div>`}
     `;
   }
 
   private renderVerdict() {
     const bank = this.bank!;
-    const t = this.tally();
-    const { sectionRows, right, total, unanswered, v } = t;
+    const tl = this.tally();
+    const { sectionRows, right, total, unanswered, v } = tl;
     return html`
       <div class="verdict" role="status">
-        <div class="big ${v.passed ? 'pass' : 'fail'}">${Math.round(v.percent)}% — ${v.passed ? 'PASS' : 'FAIL'}</div>
-        <div>${right} of ${total} correct · the bar: pass ${bank.passPercent}%${bank.honoursPercent ? `, Honours ${bank.honoursPercent}%` : ''}</div>
-        ${unanswered > 0 ? html`<div class="unanswered">${unanswered} unanswered — counted as incorrect</div>` : nothing}
-        ${v.honours ? html`<div class="honours">Honours — ${Math.round(v.percent)}% ≥ ${bank.honoursPercent}%</div>` : nothing}
+        <div class="big ${v.passed ? 'pass' : 'fail'}">${Math.round(v.percent)}% — ${v.passed ? t('exam.passWord') : t('exam.failWord')}</div>
+        <div>${t('exam.theBar', { c: right, n: total, p: bank.passPercent, h: bank.honoursPercent ? t('exam.honoursSuffix', { p: bank.honoursPercent }) : '' })}</div>
+        ${unanswered > 0 ? html`<div class="unanswered">${t('exam.unansweredLine', { n: unanswered })}</div>` : nothing}
+        ${v.honours ? html`<div class="honours">${t('exam.honoursBadge', { p: Math.round(v.percent), h: bank.honoursPercent ?? 0 })}</div>` : nothing}
         <table class="breakdown">
-          <tr><th>Section</th><th>Correct</th><th>Of</th></tr>
+          <tr><th>${t('exam.sectionH')}</th><th>${t('exam.correctH')}</th><th>${t('exam.ofH')}</th></tr>
           ${Object.entries(sectionRows).map(([section, r]) => html`
             <tr><td>${section}</td><td>${r.right}</td><td>${r.total}</td></tr>
           `)}
         </table>
-        <p><button class="primary" @click="${() => void this.abandon()}">Done</button></p>
+        <p><button class="primary" @click="${() => void this.abandon()}">${t('exam.done')}</button></p>
       </div>
     `;
   }

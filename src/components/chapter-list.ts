@@ -1,5 +1,6 @@
 import { LitElement, html, css, nothing } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
+import { getLang, onLangChange, t, type Lang } from '../lib/i18n.js';
 
 export interface SubsectionStat {
   id: string; // e.g. B-001-002 (the ISED exam subsection)
@@ -24,6 +25,20 @@ export interface SubjectBlock {
 @customElement('chapter-list')
 export class ChapterList extends LitElement {
   @property({ type: Array }) blocks: SubjectBlock[] = [];
+  @state() private uiLang: Lang = getLang();
+
+  private unsubLang?: () => void;
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    this.unsubLang = onLangChange(() => { this.uiLang = getLang(); });
+  }
+
+  disconnectedCallback(): void {
+    this.unsubLang?.();
+    this.unsubLang = undefined;
+    super.disconnectedCallback();
+  }
 
   static styles = css`
     :host {
@@ -139,19 +154,20 @@ export class ChapterList extends LitElement {
         <div class="rows">
           ${b.subsections.map(s => {
             const covered = s.total > 0 ? Math.min(1, s.studied / s.total) : 0;
-            const state = s.studied === 0 ? 'new' : s.studied >= s.total ? 'done' : 'in progress';
+            const state = s.studied === 0 ? t('list.new') : s.studied >= s.total ? t('list.done') : t('list.inProgress');
+            const stateCls = s.studied === 0 ? 'new' : s.studied >= s.total ? 'done' : 'in-progress';
             return html`
               <button class="section-row" @click="${() => this.start(s.id)}">
                 <div class="row-top">
                   <span class="section-id">${s.id}</span>
-                  <span class="state ${state.replace(' ', '-')}">${state}</span>
+                  <span class="state ${stateCls}">${state}</span>
                 </div>
                 ${s.title ? html`<div class="s-title">${s.title}</div>` : nothing}
                 <div class="progress-track" role="progressbar" aria-valuenow="${s.studied}" aria-valuemax="${s.total}">
                   <div class="progress-fill" style="width: ${Math.round(covered * 100)}%"></div>
                 </div>
                 <div class="stats">
-                  ${s.studied === 0 ? `${s.total} questions` : `${s.studied}/${s.total} studied`}
+                  ${s.studied === 0 ? t('list.nQuestions', { n: s.total }) : t('list.nStudied', { s: s.studied, n: s.total })}
                 </div>
               </button>
             `;

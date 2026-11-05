@@ -3,6 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import type { ExamQuestion } from '../data/exam-banks.js';
 import type { ProgressStore, ProgressRecord } from '../lib/progress.js';
 import { nextSchedule } from '../lib/sm2.js';
+import { getLang, onLangChange, t, type Lang } from '../lib/i18n.js';
 import { inFormControl, onWindowKey } from '../lib/keys.js';
 import './question-card.js';
 
@@ -31,10 +32,13 @@ export class ReviewSession extends LitElement {
   @state() answeredCorrectly: (boolean | null)[] = [];
   @state() loaded = false;
 
+  @state() private uiLang: Lang = getLang();
   private keyOff: (() => void) | null = null;
+  private unsubLang?: () => void;
 
   connectedCallback(): void {
     super.connectedCallback();
+    this.unsubLang = onLangChange(() => { this.uiLang = getLang(); });
     // grade keys: 1-4 map onto Again/Hard/Good/Easy (SM-2 qualities 1/3/4/5)
     // once the card is answered; before that the digits answer the question
     this.keyOff = onWindowKey((ke) => {
@@ -50,6 +54,8 @@ export class ReviewSession extends LitElement {
   }
 
   disconnectedCallback(): void {
+    this.unsubLang?.();
+    this.unsubLang = undefined;
     this.keyOff?.();
     this.keyOff = null;
     super.disconnectedCallback();
@@ -155,7 +161,7 @@ export class ReviewSession extends LitElement {
 
   protected render() {
     if (this.loaded && this.queue.length === 0) {
-      return html`<div class="empty" role="status">Nothing due right now — you have everything scheduled. Practice a topic instead, or come back tomorrow.</div>`;
+      return html`<div class="empty" role="status">${t('review.empty')}</div>`;
     }
     if (this.position >= this.queue.length) {
       if (!this.loaded) return nothing;
@@ -164,7 +170,7 @@ export class ReviewSession extends LitElement {
     const q = this.current;
     const answered = this.answeredCorrectly[this.position] !== null;
     return html`
-      <div class="heading">Review (${this.position + 1} / ${this.queue.length})</div>
+      <div class="heading">${t('review.heading', { i: this.position + 1, n: this.queue.length })}</div>
       ${q ? html`
         <question-card
           .question="${q}"
@@ -177,14 +183,14 @@ export class ReviewSession extends LitElement {
           }}"
         ></question-card>
         ${answered ? html`
-          <div class="grades" role="group" aria-label="How well did you know it?">
-            <button class="grade" data-quality="1" title="Key 1" @click="${() => void this.grade(1)}">Again <kbd>1</kbd></button>
-            <button class="grade" data-quality="3" title="Key 2" @click="${() => void this.grade(3)}">Hard <kbd>2</kbd></button>
-            <button class="grade" data-quality="4" title="Key 3" @click="${() => void this.grade(4)}">Good <kbd>3</kbd></button>
-            <button class="grade" data-quality="5" title="Key 4" @click="${() => void this.grade(5)}">Easy <kbd>4</kbd></button>
+          <div class="grades" role="group" aria-label="${t('review.gradesAria')}">
+            <button class="grade" data-quality="1" title="Key 1" @click="${() => void this.grade(1)}">${t('review.again')} <kbd>1</kbd></button>
+            <button class="grade" data-quality="3" title="Key 2" @click="${() => void this.grade(3)}">${t('review.hard')} <kbd>2</kbd></button>
+            <button class="grade" data-quality="4" title="Key 3" @click="${() => void this.grade(4)}">${t('review.good')} <kbd>3</kbd></button>
+            <button class="grade" data-quality="5" title="Key 4" @click="${() => void this.grade(5)}">${t('review.easy')} <kbd>4</kbd></button>
           </div>
         ` : nothing}
-      ` : html`<div class="empty">This question is no longer in the bank — skipped.</div>`}
+      ` : html`<div class="empty">${t('review.gone')}</div>`}
     `;
   }
 
@@ -194,8 +200,7 @@ export class ReviewSession extends LitElement {
     const skipped = this.queue.length - this.answeredCorrectly.filter(c => c !== null).length;
     return html`
       <div class="summary" role="status">
-        Review complete — ${good} good, ${missed} missed${skipped ? `, ${skipped} skipped` : ''}.
-        The next reviews are scheduled; practice a topic any time.
+        ${t('review.done', { g: good, m: missed, skip: skipped ? t('review.skippedTail', { n: skipped }) : '' })}
       </div>
     `;
   }

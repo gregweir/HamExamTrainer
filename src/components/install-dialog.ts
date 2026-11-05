@@ -1,5 +1,6 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import { getLang, onLangChange, t, type Lang } from '../lib/i18n.js';
 
 /**
  * One page-level capture of Chrome/Edge's beforeinstallprompt event: the
@@ -39,6 +40,8 @@ function detectPlatform(): Platform {
 export class InstallDialog extends LitElement {
   @state() open = false;
   @state() promptReady = false;
+  @state() private uiLang: Lang = getLang();
+  private unsubLang?: () => void;
   private platform: Platform = 'desktop';
 
   static styles = css`
@@ -132,9 +135,16 @@ export class InstallDialog extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
+    this.unsubLang = onLangChange(() => { this.uiLang = getLang(); });
     captureInstallPrompt();
     this.platform = detectPlatform();
     this.promptReady = deferredPrompt !== null;
+  }
+
+  disconnectedCallback(): void {
+    this.unsubLang?.();
+    this.unsubLang = undefined;
+    super.disconnectedCallback();
   }
 
   public show(): void {
@@ -157,55 +167,53 @@ export class InstallDialog extends LitElement {
     this.close();
   }
 
+  private stepsName(kind: Platform): string {
+    if (kind === 'ios') return t('install.ios.name');
+    if (kind === 'android') return t('install.android.name');
+    return t('install.desktop.name');
+  }
+
   private renderSteps(kind: Platform): unknown {
     if (kind === 'ios') {
       return html`<ol>
-        <li>Open this site in <strong>Safari</strong>.</li>
-        <li>Tap the <strong>Share</strong> button (square with an arrow).</li>
-        <li>Tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
+        <li>${t('install.ios.s1')}</li>
+        <li>${t('install.ios.s2')}</li>
+        <li>${t('install.ios.s3')}</li>
       </ol>`;
     }
     if (kind === 'android') {
       return html`<ol>
-        <li>Open this site in <strong>Chrome</strong>.</li>
-        <li>Tap the <strong>&#8942;</strong> menu button.</li>
-        <li>Tap <strong>Install app</strong> (or <span>Add to Home screen</span>).</li>
+        <li>${t('install.android.s1')}</li>
+        <li>${t('install.android.s2')}</li>
+        <li>${t('install.android.s3')}</li>
       </ol>`;
     }
     return html`<ol>
-      <li>Open this site in <strong>Chrome</strong> or <strong>Edge</strong>.</li>
-      <li>Look for the install icon at the right end of the address bar.</li>
-      <li>Click <strong>Install</strong>.</li>
+      <li>${t('install.desktop.s1')}</li>
+      <li>${t('install.desktop.s2')}</li>
+      <li>${t('install.desktop.s3')}</li>
     </ol>`;
   }
-
-  private static readonly platformNames: Record<Platform, string> = {
-    ios: 'iPhone & iPad',
-    android: 'Android phone or tablet',
-    desktop: 'Windows, Mac or Linux',
-  };
 
   protected render(): unknown {
     const order: Platform[] = [this.platform, ...(['ios', 'android', 'desktop'] as Platform[]).filter(p => p !== this.platform)];
     return html`
       <dialog @cancel="${() => { this.open = false; }}">
-        <h2>Install the app</h2>
+        <h2>${t('install.title')}</h2>
         <p class="sub">
-          The trainer can live on your device. Once installed, it opens
-          full-screen from your home screen and works offline — every
-          question bank stays on the device.
+          ${t('install.sub')}
         </p>
         ${this.promptReady && this.platform !== 'ios' ? html`
-          <button class="install-now" @click="${() => void this.installNow()}">Install now</button>
+          <button class="install-now" @click="${() => void this.installNow()}">${t('install.now')}</button>
         ` : nothing}
         ${order.map(kind => html`
           <section class="steps ${kind === this.platform ? 'own' : ''}">
-            <h3>${InstallDialog.platformNames[kind]}</h3>
+            <h3>${this.stepsName(kind)}</h3>
             ${this.renderSteps(kind)}
           </section>
         `)}
         <footer>
-          <button class="close-btn" @click="${() => this.close()}">Close</button>
+          <button class="close-btn" @click="${() => this.close()}">${t('install.close')}</button>
         </footer>
       </dialog>
     `;

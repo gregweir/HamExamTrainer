@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { watchForServiceWorkerUpdate } from '../lib/update-banner.js';
+import { getLang, onLangChange, t, type Lang } from '../lib/i18n.js';
 
 /**
  * One-line toast: "New version ready" + Reload, shown when a freshly
@@ -9,6 +10,8 @@ import { watchForServiceWorkerUpdate } from '../lib/update-banner.js';
 @customElement('update-toast')
 export class UpdateToast extends LitElement {
   @state() visible = false;
+  @state() private uiLang: Lang = getLang();
+  private unsubLang?: () => void;
 
   static styles = css`
     :host {
@@ -51,7 +54,14 @@ export class UpdateToast extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
+    this.unsubLang = onLangChange(() => { this.uiLang = getLang(); });
     watchForServiceWorkerUpdate(() => { this.visible = true; });
+  }
+
+  disconnectedCallback(): void {
+    this.unsubLang?.();
+    this.unsubLang = undefined;
+    super.disconnectedCallback();
   }
 
   /** Test/external hook: surface the toast (the watcher calls its callback). */
@@ -69,8 +79,8 @@ export class UpdateToast extends LitElement {
     }
     return html`
       <div class="toast" role="status">
-        <span>New version ready — a quick reload picks it up.</span>
-        <button @click="${() => this.reload()}">Reload</button>
+        <span>${t('toast.newVersion')}</span>
+        <button @click="${() => this.reload()}">${t('toast.reload')}</button>
       </div>
     `;
   }

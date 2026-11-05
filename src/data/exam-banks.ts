@@ -60,12 +60,16 @@ export interface BankDefinition {
   id: ExamBankId;
   title: string;
   subtitle: string;
+  /** French display names (Canadian banks carry official ISED wording). */
+  titleFr?: string;
+  subtitleFr?: string;
   questionCount: number; // questions in the bank
   examLength: number; // questions per mock exam (all banks draw section-distributed samples)
   passPercent: number; // pass mark in whole percent (e.g. 74 = 74%)
   honoursPercent?: number; // optional second bar (CA Basic: 80% earns the Honours certificate)
   sections: string[]; // ordered section list
   bookCta: BookCta;
+  bookCtaFr?: BookCta;
 }
 
 /** US Technician (2026–2030), parsed from NCVEC. */
@@ -89,20 +93,38 @@ const usTechGroups = (syllabus as { groups: Record<string, string>; subelements:
 interface CaSectionNames {
   blocks: Record<string, string>;
   subsections: Record<string, string>;
+  blocks_fr?: Record<string, string>;
+  subsections_fr?: Record<string, string>;
 }
 /** Subject-block and subsection titles for the ISED banks (derived from the questions as UI metadata; the bank text itself ships verbatim). */
 const caNames = (blockNamesCa as { 'ca-basic': CaSectionNames; 'ca-advanced': CaSectionNames });
 
+/** Display metadata for a bank: French where the bank ships one and the UI is French. */
+export function bankDisplay(bank: BankDefinition, lang: 'en' | 'fr'): {
+  title: string; subtitle: string; bookCta: BookCta;
+} {
+  if (lang === 'fr') {
+    return {
+      title: bank.titleFr ?? bank.title,
+      subtitle: bank.subtitleFr ?? bank.subtitle,
+      bookCta: bank.bookCtaFr ?? bank.bookCta,
+    };
+  }
+  return { title: bank.title, subtitle: bank.subtitle, bookCta: bank.bookCta };
+}
+
 /** The ISED exam structure: one question is drawn from each subsection on the real exam. */
-export function bankBlock(bankId: ExamBankId, subsection: string): string | null {
+export function bankBlock(bankId: ExamBankId, subsection: string, lang: 'en' | 'fr' = 'en'): string | null {
   if (!bankId.startsWith('ca')) return null;
-  return caNames[bankId === 'ca-advanced' ? 'ca-advanced' : 'ca-basic'].blocks[subsection.slice(0, 5)] ?? null;
+  const names = caNames[bankId === 'ca-advanced' ? 'ca-advanced' : 'ca-basic'];
+  return (lang === 'fr' ? names.blocks_fr : names.blocks)?.[subsection.slice(0, 5)] ?? names.blocks[subsection.slice(0, 5)] ?? null;
 }
 
 /** Readable short title for an ISED subsection (e.g. B-003-012 → "Mic gain and splatter"). */
-export function subsectionTitle(bankId: ExamBankId, subsection: string): string | null {
+export function subsectionTitle(bankId: ExamBankId, subsection: string, lang: 'en' | 'fr' = 'en'): string | null {
   if (!bankId.startsWith('ca')) return null;
-  return caNames[bankId === 'ca-advanced' ? 'ca-advanced' : 'ca-basic'].subsections[subsection] ?? null;
+  const names = caNames[bankId === 'ca-advanced' ? 'ca-advanced' : 'ca-basic'];
+  return (lang === 'fr' ? names.subsections_fr : names.subsections)?.[subsection] ?? names.subsections[subsection] ?? null;
 }
 /** Group titles for US General/Extra come from their syllabi; CA advanced falls back to the group id. */
 export function sectionTitle(bankId: ExamBankId, section: string): string {
@@ -110,6 +132,23 @@ export function sectionTitle(bankId: ExamBankId, section: string): string {
     return usTechGroups.groups[section] ?? section;
   }
   return section;
+}
+
+/**
+ * Official French presentation of a Canadian question: ISED ships both
+ * languages in the same row, sharing the answer permutation. US questions are
+ * canonical English regardless (the NCVEC exams are English-only).
+ */
+export function localizeQuestion(q: ExamQuestion, lang: 'en' | 'fr'): ExamQuestion {
+  if (lang !== 'fr') return q;
+  const cq = q as CaExamQuestion;
+  if (!('question_fr' in cq) || !cq.question_fr) return q;
+  return {
+    ...q,
+    question: cq.question_fr,
+    choices: cq.choices_fr,
+    correctIndex: cq.correctIndex_fr >= 0 ? cq.correctIndex_fr : cq.correctIndex,
+  };
 }
 
 /** Subelement heading for a section (e.g. T1A → 'COMMISSION\'S RULES', G1A → 'COMMISSION'S RULES'). */
@@ -137,51 +176,66 @@ export const BANKS: BankDefinition[] = [
     id: 'us-tech',
     title: 'US Technician',
     subtitle: 'NCVEC Technician pool, 2026–2030 · 35-question exam, 74% to pass',
+    titleFr: 'Technicien (É.-U.)',
+    subtitleFr: 'Pool NCVEC Technicien, 2026–2030 · examen de 35 questions, 74 % pour réussir (en anglais)',
     questionCount: 409,
     examLength: 35,
     passPercent: 74,
     sections: sectionsOf(US_TECH),
     bookCta: { label: 'Read RadioBook 3', href: 'https://radiobook.ca/b3' },
+    bookCtaFr: { label: 'Lire RadioBook 3', href: 'https://radiobook.ca/b3' },
   },
   {
     id: 'us-general',
     title: 'US General',
     subtitle: 'NCVEC General pool, 2023–2027 · 35-question exam, 74% to pass',
+    titleFr: 'Général (É.-U.)',
+    subtitleFr: 'Pool NCVEC Général, 2023–2027 · examen de 35 questions, 74 % pour réussir (en anglais)',
     questionCount: 423,
     examLength: 35,
     passPercent: 74,
     sections: sectionsOf(US_GENERAL),
     bookCta: { label: 'Read RadioBook 2', href: 'https://radiobook.ca/b2' },
+    bookCtaFr: { label: 'Lire RadioBook 2', href: 'https://radiobook.ca/b2' },
   },
   {
     id: 'us-extra',
     title: 'US Extra',
     subtitle: 'NCVEC Extra pool, 2024–2028 · 50-question exam, 74% to pass',
+    titleFr: 'Extra (É.-U.)',
+    subtitleFr: 'Pool NCVEC Extra, 2024–2028 · examen de 50 questions, 74 % pour réussir (en anglais)',
     questionCount: 599,
     examLength: 50,
     passPercent: 74,
     sections: sectionsOf(US_EXTRA),
     bookCta: { label: 'Read RadioBook 5', href: 'https://radiobook.ca/b5' },
+    bookCtaFr: { label: 'Lire RadioBook 5', href: 'https://radiobook.ca/b5' },
   },
   {
     id: 'ca-basic',
     title: 'Canadian Basic',
     subtitle: 'ISED Basic question bank (re-based 2025-07-15) · 100-question exam, 70% to pass (80% Honours)',
+    titleFr: 'Canadien — Base',
+    subtitleFr: 'Banque de questions de base d’ISED (re-basée 2025-07-15) · examen de 100 questions, 70 % pour réussir (80 % avec mention d’honneur)',
     questionCount: 984,
     examLength: 100,
     passPercent: 70,
     honoursPercent: 80,
     sections: sectionsOf(CA_BASIC),
     bookCta: { label: 'Read RadioBook 3', href: 'https://radiobook.ca/b3' },
+    bookCtaFr: { label: 'Lire RadioBook 3', href: 'https://radiobook.ca/b3' },
   },
   {
     id: 'ca-advanced',
     title: 'Canadian Advanced',
     subtitle: 'ISED Advanced question bank · 50-question exam, 70% to pass',
+    titleFr: 'Canadien — Avancé',
+    subtitleFr: 'Banque de questions avancées d’ISED · examen de 50 questions, 70 % pour réussir',
     questionCount: 549,
     examLength: 50,
     passPercent: 70,
     sections: sectionsOf(CA_ADVANCED),
     bookCta: { label: 'Read RadioBook 5', href: 'https://radiobook.ca/b5' },
+    bookCtaFr: { label: 'Lire RadioBook 5', href: 'https://radiobook.ca/b5' },
   },
 ];

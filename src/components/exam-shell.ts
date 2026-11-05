@@ -3,11 +3,16 @@ import { customElement, state } from 'lit/decorators.js';
 import logoUrl from '../assets/logo.jpg';
 import {
   BANKS,
+  bankBlock,
+  bankDisplay,
   CA_ADVANCED,
   CA_BASIC,
+  sectionTitle,
+  subelementTitle,
   US_EXTRA,
   US_GENERAL,
   US_TECH,
+  subsectionTitle,
   type BankDefinition,
   type ExamQuestion,
 } from '../data/exam-banks.js';
@@ -15,7 +20,7 @@ import { initialThemeMode, cycleThemeMode } from '../lib/theme.js';
 import { ProgressStore } from '../lib/progress.js';
 import { nextSchedule } from '../lib/sm2.js';
 import { contentIdentityFromQuestion } from '../lib/ident.js';
-import { bankBlock, sectionTitle, subsectionTitle, subelementTitle } from '../data/exam-banks.js';
+import { getLang, onLangChange, setLang, t, type Lang } from '../lib/i18n.js';
 import './question-card.js';
 import './chapter-list.js';
 import './book-cta.js';
@@ -53,6 +58,29 @@ export class ExamShell extends LitElement {
   /** Per-section progress for the chapter list (loaded from the store, async). */
   @state() sectionStats: SubsectionStat[] = [];
   @state() blocks: SubjectBlock[] = [];
+  @state() uiLang: Lang = getLang();
+
+  private unsubLang?: () => void;
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    this.unsubLang = onLangChange(() => {
+      this.uiLang = getLang();
+      // the tile titles localize in refreshSectionStats' block map
+      void this.refreshSectionStats();
+    });
+  }
+
+  disconnectedCallback(): void {
+    this.unsubLang?.();
+    this.unsubLang = undefined;
+    super.disconnectedCallback();
+  }
+
+  /** This bank's display metadata in the current language. */
+  private get display(): ReturnType<typeof bankDisplay> {
+    return bankDisplay(this.bank, this.uiLang);
+  }
 
   updated(changed: Map<string, unknown>): void {
     super.updated(changed);
@@ -93,10 +121,10 @@ export class ExamShell extends LitElement {
       const blockIdOf = (id: string) => (isCa ? id.slice(0, 5) : id.slice(0, 2));
       const blockTitleOf = (id: string) =>
         isCa
-          ? bankBlock(bank.id, blockIdOf(id)) ?? null
+          ? bankBlock(bank.id, blockIdOf(id), this.uiLang) ?? null
           : subelementTitle(bank.id, blockIdOf(id));
       const subTitleOf = (id: string) =>
-        isCa ? subsectionTitle(bank.id, id) ?? undefined : sectionTitle(bank.id, id);
+        isCa ? subsectionTitle(bank.id, id, this.uiLang) ?? undefined : sectionTitle(bank.id, id);
       this.blocks = bank.sections.reduce<SubjectBlock[]>((acc, id) => {
         const blockId = blockIdOf(id);
         const title = blockTitleOf(id) ?? sectionTitle(bank.id, blockId);
@@ -267,31 +295,41 @@ export class ExamShell extends LitElement {
     book-cta {
       margin-top: 14px;
     }
+
+    .lang-note {
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: var(--tl-text-muted, #255665);
+      border-left: 3px solid var(--tl-sage, #97a28a);
+      padding: 4px 0 4px 12px;
+      margin: 10px 0 0;
+    }
   `;
 
   /* ------------------------------- render ------------------------------- */
 
   protected render(): unknown {
+    const mode = this.display;
     return html`
       <div class="brandbar">
         <img class="brand-logo" src="${logoUrl}" alt="Tartanleaf">
         <div>
           <div class="brand-name">Tartanleaf Ham Exam Trainer</div>
-          <div class="brand-sub">${this.bank.subtitle}</div>
+          <div class="brand-sub">${mode.subtitle}</div>
         </div>
         <button
           class="mode-btn"
-          aria-label="Switch between light and dark mode"
+          aria-label="${t('a11y.mode')}"
           @click="${function () { document.documentElement.dataset.mode = cycleThemeMode(); }}"
         >◐</button>
         <button
           class="mode-btn install-btn"
-          aria-label="How to install this app on your device"
+          aria-label="Install this app — instructions per device"
           @click="${() => this.renderRoot.querySelector('install-dialog')?.show()}"
-        >Install</button>
+        >${t('install.button')}</button>
         <select
           class="bank-chooser"
-          aria-label="Choose an exam"
+          aria-label="${t('a11y.bank')}"
           .value="${this.bank.id}"
           @change="${(e: Event) => {
             const pick = BANKS.find(b => b.id === (e.target as HTMLSelectElement).value) ?? BANKS[0]!;
@@ -299,20 +337,25 @@ export class ExamShell extends LitElement {
             this.view = { kind: 'practice-pick' };
           }}"
         >
-          ${BANKS.map(b => html`<option value="${b.id}">${b.title}</option>`)}
+          ${BANKS.map(b => html`<option value="${b.id}">${b.titleFr && this.uiLang === 'fr' ? b.titleFr : b.title}</option>`)}
         </select>
+        <button
+          class="mode-btn lang-btn"
+          aria-label="Switch between English and French"
+          @click="${() => setLang(this.uiLang === 'fr' ? 'en' : 'fr')}"
+        >${this.uiLang === 'fr' ? 'EN' : 'FR'}</button>
       </div>
-      <div class="tabs" role="tablist" aria-label="Study modes">
-        ${(['practice', 'review', 'exam'] as const).map(t => html`
+      <div class="tabs" role="tablist" aria-label="${t('a11y.modes')}">
+        ${(['practice', 'review', 'exam'] as const).map(tab => html`
           <button
             class="tab"
             role="tab"
-            aria-selected="${this.tab === t}"
+            aria-selected="${this.tab === tab}"
             @click="${() => {
-              this.tab = t;
+              this.tab = tab;
               this.view = { kind: 'practice-pick' };
             }}"
-          >${t[0]!.toUpperCase() + t.slice(1)}</button>
+          >${t(`tab.${tab}`)}</button>
         `)}
       </div>
       <div class="content">
@@ -330,8 +373,8 @@ export class ExamShell extends LitElement {
         `}
       </div>
       <book-cta
-        .bookHref="${this.bank.bookCta.href}"
-        .bookLabel="${this.bank.bookCta.label}"
+        .bookHref="${mode.bookCta.href}"
+        .bookLabel="${mode.bookCta.label}"
       ></book-cta>
       <install-dialog></install-dialog>
       <update-toast></update-toast>
@@ -350,9 +393,12 @@ export class ExamShell extends LitElement {
         <div class="home-head">
           <div class="ready" role="status">
             <span class="ready-num">${readiness}%</span>
-            <span class="ready-label">ready · ${seen} of ${total} questions studied</span>
+            <span class="ready-label">${t('ready', { s: seen, n: total })}</span>
           </div>
         </div>
+        ${this.uiLang === 'fr' && this.bank.id.startsWith('us') ? html`
+          <p class="lang-note">${t('us.englishNote')}</p>
+        ` : ''}
         <chapter-list
         .blocks="${this.blocks}"
         @section-start="${(e: CustomEvent) => {
@@ -363,13 +409,13 @@ export class ExamShell extends LitElement {
       ></chapter-list>`;
     }
     if (v.index >= v.questions.length) {
-      return html`<div class="done-note">Section ${v.section} complete — progress saved locally.</div>`;
+      return html`<div class="done-note">${t('section.complete', { s: v.section })}</div>`;
     }
     const q = v.questions[v.index]!;
     return html`
       <div class="session-bar">
-        <button class="back" @click="${() => { this.view = { kind: 'practice-pick' }; }}">← Topics</button>
-        <span>${v.section} · question ${v.index + 1} / ${v.questions.length}</span>
+        <button class="back" @click="${() => { this.view = { kind: 'practice-pick' }; }}">${t('back.topics')}</button>
+        <span>${v.section} · ${t('exam.questionN', { i: v.index + 1, n: v.questions.length })}</span>
       </div>
       <question-card
         .question="${q}"

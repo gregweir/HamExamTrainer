@@ -342,6 +342,23 @@ describe('ISED UI title metadata', () => {
     }
   });
 
+  it('covers every CA id with a FRENCH title as well, no leftovers', () => {
+    const names = sectionNames as unknown as Record<string, { blocks_fr: Record<string, string>; subsections_fr: Record<string, string> }>;
+    for (const [bankId, data] of Object.entries({ 'ca-basic': CA_BASIC, 'ca-advanced': CA_ADVANCED })) {
+      const subs = [...new Set((data as ExamQuestion[]).map(q => q.section))];
+      const blocks = [...new Set(subs.map(s => s.slice(0, 5)))];
+      const en = sectionNames as unknown as Record<string, { blocks: Record<string, string>; subsections: Record<string, string> }>;
+      // mirror the EN map exactly (same id sets), FR text non-empty and differing from the EN
+      expect(Object.keys(names[bankId]!.blocks_fr).sort()).toEqual(Object.keys(en[bankId]!.blocks).sort());
+      expect(Object.keys(names[bankId]!.subsections_fr).sort()).toEqual(Object.keys(en[bankId]!.subsections).sort());
+      for (const [id, fr] of Object.entries(names[bankId]!.blocks_fr)) {
+        expect(fr, `${bankId} block_fr ${id}`).toBeTruthy();
+        expect(fr).not.toBe(en[bankId]!.blocks[id]);
+      }
+      for (const id of subs) expect(names[bankId]!.subsections_fr[id], `${bankId} subsection_fr ${id}`).toBeTruthy();
+    }
+  });
+
   it('US banks get no CA-derived titles (their syllabus names already carry them)', () => {
     expect(subsectionTitle('us-tech', 'T0A')).toBeNull();
     expect(bankBlock('us-tech', 'T0A-01')).toBeNull();
