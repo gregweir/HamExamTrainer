@@ -45,7 +45,6 @@ export interface ExportBundle {
   settings: Record<string, unknown>;
 }
 
-const DB_NAME_SCOPING = -1; // openDB takes the name only in this app's use
 
 export class ProgressStore {
   private readonly dbName: string;
