@@ -27,5 +27,7 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     globals: true,
+    // IndexedDB is absent in happy-dom: fake-indexeddb implements it for tests.
+    setupFiles: ['fake-indexeddb/auto'],
   },
 });

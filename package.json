@@ -15,11 +15,13 @@
     "validate": "npm run typecheck && npm run build && npm run test"
   },
   "dependencies": {
+    "idb": "^8.0.3",
     "lit": "^3.3.2"
   },
   "devDependencies": {
     "@open-wc/testing": "^4.0.0",
     "@types/node": "26.6.6",
+    "fake-indexeddb": "^6.2.2",
     "happy-dom": "^20.0.11",
     "typescript": "^5.9.3",
     "vite": "^7.1.11",
