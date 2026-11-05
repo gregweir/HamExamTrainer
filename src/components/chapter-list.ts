@@ -42,6 +42,14 @@ export class ChapterList extends LitElement {
       overflow: hidden;
     }
 
+    .block-code {
+      font-family: var(--font-mono, monospace);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--tl-text-muted, #255665);
+      margin-right: 8px;
+    }
+
     .rows {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -127,7 +135,7 @@ export class ChapterList extends LitElement {
       ${this.blocks.map(b => html`
         <div class="block-title"
           role="heading" aria-level="3"
-        >${b.title ?? b.id}</div>
+        >${b.title ? html`<span class="block-code">${b.id}</span>${b.title}` : b.id}</div>
         <div class="rows">
           ${b.subsections.map(s => {
             const covered = s.total > 0 ? Math.min(1, s.studied / s.total) : 0;

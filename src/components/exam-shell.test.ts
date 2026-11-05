@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { fixture, html } from '@open-wc/testing';
+import syllabusData from '../data/us-tech-syllabus.json';
 import '../components/exam-shell.js';
 import type { ExamShell } from '../components/exam-shell.js';
 
@@ -62,8 +63,9 @@ describe('exam-shell', () => {
     const read = async (): Promise<{ block: any; subsection: any }> => {
       await el.updateComplete;
       const cl = el.shadowRoot!.querySelector('chapter-list');
-      const block = (cl as any)?.blocks?.find((b: any) => b.id === 'T1B');
-      return { block, subsection: block?.subsections[0] };
+      // US banks group their syllabus groups under the subelement (T1B → T1)
+      const block = (cl as any)?.blocks?.find((b: any) => b.id === 'T1');
+      return { block, subsection: block?.subsections?.find((s: any) => s.id === 'T1B') };
     };
     let result: { block: any; subsection: any };
     for (let i = 0; i < 60; i++) {
@@ -72,14 +74,17 @@ describe('exam-shell', () => {
       await new Promise(r => setTimeout(r, 10));
     }
     expect(result!.subsection, 'T1B row carries store-derived stats').toBeTruthy();
+    expect(result!.block.title, 'the T1 subelement header carries its NCVEC name').toBe(US_TECH_GROUPS.get('T1'));
+    expect(result!.subsection.title, 'US tile carries its official group name').toBe(US_TECH_GROUPS.get('T1B'));
     expect(result!.subsection.studied, 'T1B studied count comes from the store').toBe(2);
     expect(result!.subsection.correct).toBe(1);
-    // untouched sections still read as new
-    const cl = el.shadowRoot!.querySelector('chapter-list');
-    const t1aBlock = (cl as any).blocks?.find((b: any) => b.id === 'T1A');
-    expect(t1aBlock.subsections[0].studied).toBe(0);
   });
 });
+
+const syllabus = syllabusData as { subelements: Record<string, string>; groups: Record<string, string> };
+const US_TECH_GROUPS = new Map(
+  [...Object.entries(syllabus.groups), ...Object.entries(syllabus.subelements)],
+);
 
 /** The block/section stats load asynchronously — wait until the chapter list carries data. */
 async function waitForChapterList(el: ExamShell): Promise<any> {

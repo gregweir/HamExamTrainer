@@ -85,12 +85,21 @@ export class ExamShell extends LitElement {
     // ignore a stale load (the bank changed while awaiting)
     if (this.bank === bank) {
       this.sectionStats = bank.sections.map(id => totals.get(id)!);
-      // two-level view: group the subsections under their subject block and
-      // title it (US banks: NCVEC group names; CA banks: the block map)
+      // two-level view: CA banks group subsections under their subject
+      // block; US banks group their syllabus groups under the NCVEC
+      // subelement (T1A → T1 "COMMISSION'S RULES").
+      const isCa = bank.id.startsWith('ca');
+      const blockIdOf = (id: string) => (isCa ? id.slice(0, 5) : id.slice(0, 2));
+      const blockTitleOf = (id: string) =>
+        isCa
+          ? bankBlock(bank.id, blockIdOf(id)) ?? null
+          : subelementTitle(bank.id, blockIdOf(id));
+      const subTitleOf = (id: string) =>
+        isCa ? subsectionTitle(bank.id, id) ?? undefined : sectionTitle(bank.id, id);
       this.blocks = bank.sections.reduce<SubjectBlock[]>((acc, id) => {
-        const blockId = id.slice(0, 6);
-        const title = bankBlock(bank.id, blockId) ?? sectionTitle(bank.id, id);
-        const stat = { ...totals.get(id)!, title: subsectionTitle(bank.id, id) ?? undefined };
+        const blockId = blockIdOf(id);
+        const title = blockTitleOf(id) ?? sectionTitle(bank.id, blockId);
+        const stat = { ...totals.get(id)!, title: subTitleOf(id) };
         const last = acc[acc.length - 1];
         if (last && last.id === blockId) last.subsections.push(stat);
         else acc.push({ id: blockId, title, subsections: [stat] });

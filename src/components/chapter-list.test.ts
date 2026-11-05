@@ -27,6 +27,7 @@ describe('chapter-list', () => {
     const headers = [...el.shadowRoot.querySelectorAll('.block-title')];
     expect(headers.length).toBe(2);
     expect(headers[0]!.textContent).toContain('Regulations and operating requirements');
+    expect(headers[0]!.querySelector('.block-code')!.textContent).toBe('B-001');
     const rows = [...el.shadowRoot.querySelectorAll('button.section-row')];
     expect(rows.length).toBe(3);
     expect(el.shadowRoot.textContent).toContain('B-001-001');
