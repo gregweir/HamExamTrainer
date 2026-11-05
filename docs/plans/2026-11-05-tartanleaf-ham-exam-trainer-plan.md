@@ -1,6 +1,6 @@
 # Tartanleaf Ham Exam Trainer — Implementation Plan (v1)
 
-
+> Steps use checkbox (`- [ ]`) syntax for tracking; tasks are completed in order.
 
 **Goal:** Ship v1 of the Tartanleaf Ham Exam Trainer — an offline-first FOSS PWA at `radiobook.ca/trainer/` covering US Technician + Canadian Basic (both study modes: chapter practice, SM-2 spaced review, resumable timed exams with real pass rules), Tartanleaf-branded with book/suite CTAs.
 
