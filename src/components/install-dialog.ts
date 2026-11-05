@@ -37,8 +37,8 @@ function detectPlatform(): Platform {
  */
 @customElement('install-dialog')
 export class InstallDialog extends LitElement {
-  @state() accessor open = false;
-  @state() accessor promptReady = false;
+  @state() open = false;
+  @state() promptReady = false;
   private platform: Platform = 'desktop';
 
   static styles = css`

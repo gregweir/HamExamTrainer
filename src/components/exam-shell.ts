@@ -22,6 +22,7 @@ import './book-cta.js';
 import './review-session.js';
 import './exam-session.js';
 import './install-dialog.js';
+import './update-toast.js';
 import type { SubjectBlock, SubsectionStat } from './chapter-list.js';
 
 type Tab = 'practice' | 'review' | 'exam';
@@ -50,8 +51,8 @@ export class ExamShell extends LitElement {
   @state() tab: Tab = 'practice';
   @state() view: View = { kind: 'practice-pick' };
   /** Per-section progress for the chapter list (loaded from the store, async). */
-  @state() accessor sectionStats: SubsectionStat[] = [];
-  @state() accessor blocks: SubjectBlock[] = [];
+  @state() sectionStats: SubsectionStat[] = [];
+  @state() blocks: SubjectBlock[] = [];
 
   updated(changed: Map<string, unknown>): void {
     super.updated(changed);
@@ -333,6 +334,7 @@ export class ExamShell extends LitElement {
         .bookLabel="${this.bank.bookCta.label}"
       ></book-cta>
       <install-dialog></install-dialog>
+      <update-toast></update-toast>
     `;
   }
 
