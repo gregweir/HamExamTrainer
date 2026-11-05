@@ -2,7 +2,10 @@ import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import {
   BANKS,
+  CA_ADVANCED,
   CA_BASIC,
+  US_EXTRA,
+  US_GENERAL,
   US_TECH,
   type BankDefinition,
   type ExamQuestion,
@@ -26,7 +29,10 @@ type View =
 /** EN study view per bank (CA banks carry the FR data separately; EN is keyed). */
 const bankData: Partial<Record<BankDefinition['id'], ExamQuestion[]>> = {
   'us-tech': US_TECH,
+  'us-general': US_GENERAL,
+  'us-extra': US_EXTRA,
   'ca-basic': CA_BASIC as unknown as ExamQuestion[],
+  'ca-advanced': CA_ADVANCED as unknown as ExamQuestion[],
 };
 
 /**

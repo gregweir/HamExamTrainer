@@ -2,7 +2,10 @@ import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import {
   BANKS,
+  CA_ADVANCED,
   CA_BASIC,
+  US_EXTRA,
+  US_GENERAL,
   US_TECH,
   type BankDefinition,
   type ExamQuestion,
@@ -14,7 +17,10 @@ import './question-card.js';
 /** Bank questions by id (the shipped v1 banks; parked banks resolve empty). */
 const bankQuestions: Partial<Record<BankDefinition['id'], ExamQuestion[]>> = {
   'us-tech': US_TECH,
+  'us-general': US_GENERAL,
+  'us-extra': US_EXTRA,
   'ca-basic': CA_BASIC as unknown as ExamQuestion[],
+  'ca-advanced': CA_ADVANCED as unknown as ExamQuestion[],
 };
 
 /** Deterministic mulberry32 RNG for seeded samples. */

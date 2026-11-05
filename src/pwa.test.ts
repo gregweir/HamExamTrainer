@@ -59,21 +59,19 @@ describe('pwa precache manifest (after build)', () => {
     expect(css, 'stylesheet precached').not.toBeNull();
   });
 
-  it('the precache manifest includes the figures actually present in dist (shipped banks only)', () => {
+  it('the precache manifest includes every bank’s figures (all five banks now ship)', () => {
     const sw = swText();
-    // the shipped figures in dist all appear in the precache manifest
-    const figureDir = resolve(dist, 'figures/us-tech');
-    expect(existsSync(figureDir), 'shipped figures emitted to dist').toBe(true);
-    const figFiles = readdirSync(figureDir).filter((f) => f.endsWith('.png'));
-    expect(figFiles.length).toBeGreaterThanOrEqual(3);
-    for (const f of figFiles) {
-      expect(sw).toContain(`figures/us-tech/${f}`);
+    const shipped = ['us-tech', 'us-general', 'us-extra'];
+    for (const bank of shipped) {
+      const figureDir = resolve(dist, 'figures', bank);
+      expect(existsSync(figureDir), `shipped figures emitted to dist: ${bank}`).toBe(true);
+      const figFiles = readdirSync(figureDir).filter(f => f.endsWith('.png'));
+      for (const f of figFiles) {
+        expect(sw).toContain(`figures/${bank}/${f}`);
+      }
     }
-    // parked banks' figures are NOT in dist (they ship with their banks)
-    expect(existsSync(resolve(dist, 'figures/us-general'))).toBe(false);
-    expect(existsSync(resolve(dist, 'figures/us-extra'))).toBe(false);
-    expect(sw).not.toMatch(/figures\/us-general/);
-    expect(sw).not.toMatch(/figures\/us-extra/);
+    // ca banks carry no figures; the old parked-only state is gone
+    expect(existsSync(resolve(dist, 'figures'))).toBe(true);
     expect(sw).not.toMatch(/ca-advanced/);
   });
 

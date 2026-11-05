@@ -16,10 +16,13 @@ import { parseUsBank } from '../../../scripts/parse-us';
 import { validatePools } from '../../../scripts/validate-pools';
 import {
   BANKS,
+  CA_ADVANCED,
   CA_BASIC,
+  type BankDefinition,
   type CaExamQuestion,
   type ExamBankId,
   type ExamQuestion,
+  US_GENERAL,
   US_TECH,
 } from '../exam-banks';
 
@@ -189,15 +192,14 @@ describe('US parser — russolsen NCVEC pools', () => {
     }
   });
 
-  it('resolves each declared figure to an existing raw file — and, for SHIPPED banks, an emitted public copy', () => {
+  it('resolves each declared figure to an existing raw file — and an emitted public copy for every bank with figures', () => {
     const bankDirs: Record<string, string> = {
       'us-tech': 'data/raw/us/technician-2026-2030',
       'us-general': 'data/raw/us/general-2023-2027',
       'us-extra': 'data/raw/us/extra-2024-2028',
     };
-    // Parked banks' figures are unbundled: only us-tech (the shipped bank with
-    // figures) keeps a public/ copy so the precache stays lean.
-    expect(BANKS.map((b) => b.id)).toEqual(['us-tech', 'ca-basic']);
+    // all three US banks ship figures (ca banks carry none)
+    expect(BANKS.map((b) => b.id)).toEqual(['us-tech', 'us-general', 'us-extra', 'ca-basic', 'ca-advanced']);
     for (const [bank, questions] of [
       ['us-tech', US_TECH],
       ['us-general', emitted('us-general')],
@@ -210,11 +212,7 @@ describe('US parser — russolsen NCVEC pools', () => {
         expect(existsSync(join(repo, bankDirs[bank]!, file!))).toBe(true);
         // figure path is bundle-relative: public/<figure> is the served file.
         expect(q.figure).toMatch(/^figures\//);
-        if (bank === 'us-tech') {
-          expect(existsSync(join(repo, 'public', q.figure!))).toBe(true);
-        } else {
-          expect(existsSync(join(repo, 'public', 'figures', bank))).toBe(false);
-        }
+        expect(existsSync(join(repo, 'public', q.figure!))).toBe(true);
       }
     }
   });
@@ -293,10 +291,11 @@ describe('answer-index integrity across every bank', () => {
 });
 
 describe('bank registry', () => {
-  it('ships the v1 banks with exact exam rules, counts and section lists', () => {
-    expect(BANKS.map((b) => b.id)).toEqual(['us-tech', 'ca-basic']);
-    const tech = BANKS[0]!;
-    const basic = BANKS[1]!;
+  it('ships all five banks with exact exam rules, counts and section lists', () => {
+    expect(BANKS.map((b) => b.id)).toEqual(['us-tech', 'us-general', 'us-extra', 'ca-basic', 'ca-advanced']);
+    const by = (id: string): BankDefinition => BANKS.find((b) => b.id === id)!;
+    const tech = by('us-tech');
+    const basic = by('ca-basic');
     expect(tech.questionCount).toBe(409);
     expect(tech.examLength).toBe(35);
     expect(tech.passPercent).toBe(74);
@@ -316,21 +315,14 @@ describe('bank registry', () => {
       expect(b.bookCta.label.length).toBeGreaterThan(0);
       expect(b.bookCta.href.startsWith('https://radiobook.ca/')).toBe(true);
     }
-    // Book 3 CTAs per the plan (Tech→Book 3, Basic→Book 3).
+    // Book CTAs per the plan (Tech/Basic/Advanced→Book 3, General→Book 2, Extra→Book 5).
     expect(tech.bookCta.href).toBe('https://radiobook.ca/b3');
+    expect(by('us-general').bookCta.href).toBe('https://radiobook.ca/b2');
+    expect(by('us-extra').bookCta.href).toBe('https://radiobook.ca/b5');
     expect(basic.bookCta.href).toBe('https://radiobook.ca/b3');
+    expect(by('ca-advanced').bookCta.href).toBe('https://radiobook.ca/b5');
   });
 
-  it('carries flip-on rules for the parsed-but-parked banks (json on disk, NOT bundled)', () => {
-    // Parked banks ship no static import: the parsed JSONs stay on disk
-    // (validated against the raw pools by validatePools) until a later
-    // release adds one import + one BANKS entry.
-    const shipped = BANKS.map((b) => b.id);
-    for (const parked of ['us-general', 'us-extra', 'ca-advanced']) {
-      expect(shipped).not.toContain(parked);
-      expect(existsSync(join(repo, EMITTED_PATHS[parked]!))).toBe(true);
-    }
-  });
 });
 
 describe('validatePools', () => {
