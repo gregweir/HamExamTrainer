@@ -59,32 +59,33 @@ describe('exam-shell', () => {
     // return to the pick view (view object changes → the shell reloads stats)
     el.view = { kind: 'practice-pick' };
     // the stats load is async — wait for it to reflect the store
-    const readT1B = async (): Promise<any> => {
+    const read = async (): Promise<{ block: any; subsection: any }> => {
       await el.updateComplete;
       const cl = el.shadowRoot!.querySelector('chapter-list');
-      return (cl as any)?.sections?.find((s: any) => s.id === 'T1B');
+      const block = (cl as any)?.blocks?.find((b: any) => b.id === 'T1B');
+      return { block, subsection: block?.subsections[0] };
     };
-    let section: any;
+    let result: { block: any; subsection: any };
     for (let i = 0; i < 60; i++) {
-      section = await readT1B();
-      if (section?.studied === 2) break;
+      result = await read();
+      if (result.subsection?.studied === 2) break;
       await new Promise(r => setTimeout(r, 10));
     }
-    expect(section, 'T1B row carries store-derived stats').toBeTruthy();
-    expect(section.studied, 'T1B studied count comes from the store').toBe(2);
-    expect(section.correct).toBe(1);
+    expect(result!.subsection, 'T1B row carries store-derived stats').toBeTruthy();
+    expect(result!.subsection.studied, 'T1B studied count comes from the store').toBe(2);
+    expect(result!.subsection.correct).toBe(1);
     // untouched sections still read as new
     const cl = el.shadowRoot!.querySelector('chapter-list');
-    const t1a = (cl as any).sections?.find((s: any) => s.id === 'T1A');
-    expect(t1a.studied).toBe(0);
+    const t1aBlock = (cl as any).blocks?.find((b: any) => b.id === 'T1A');
+    expect(t1aBlock.subsections[0].studied).toBe(0);
   });
 });
 
-/** The section stats load asynchronously — wait until the chapter list carries data. */
+/** The block/section stats load asynchronously — wait until the chapter list carries data. */
 async function waitForChapterList(el: ExamShell): Promise<any> {
   for (let i = 0; i < 60; i++) {
     const cl = el.shadowRoot!.querySelector('chapter-list');
-    if (cl && (((cl as any).sections?.length ?? 0) > 0)) return cl;
+    if (cl && (((cl as any).blocks?.length ?? 0) > 0)) return cl;
     await new Promise(r => setTimeout(r, 10));
     await el.updateComplete;
   }

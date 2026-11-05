@@ -5,6 +5,7 @@
 // byte-for-byte by scripts/parse-us.ts and scripts/parse-ca.ts.
 
 import caAdvancedData from './banks/ca-advanced.json';
+import blockNamesCa from './section-names-ca.json';
 import caBasicData from './banks/ca-basic.json';
 import usExtraData from './banks/us-extra.json';
 import usGeneralData from './banks/us-general.json';
@@ -83,8 +84,16 @@ const sectionsOf = (questions: ExamQuestion[]): string[] => [
   ...new Set(questions.map((q) => q.section)),
 ];
 
-/** The official NCVEC syllabus names (public domain): US banks only (ISED data carries no group titles). */
+/** The official NCVEC syllabus names (public domain); US banks only. */
 const usTechGroups = (syllabus as { groups: Record<string, string>; subelements: Record<string, string> });
+/** Subject-block titles for the ISED banks (derived from the questions as UI metadata; the bank text itself ships verbatim). */
+const caBlockNames = (blockNamesCa as { 'ca-basic': Record<string, string>; 'ca-advanced': Record<string, string> });
+
+/** The ISED exam structure: one question is drawn from each subsection on the real exam. */
+export function bankBlock(bankId: ExamBankId, subsection: string): string | null {
+  if (!bankId.startsWith('ca')) return null;
+  return (caBlockNames[bankId === 'ca-basic' ? 'ca-basic' : 'ca-advanced'] as Record<string, string> | undefined)?.[subsection.slice(0, 5)] ?? null;
+}
 /** Group titles for US General/Extra come from their syllabi; CA advanced falls back to the group id. */
 export function sectionTitle(bankId: ExamBankId, section: string): string {
   if (bankId.startsWith('us')) {

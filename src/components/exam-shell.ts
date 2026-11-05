@@ -15,13 +15,13 @@ import { initialThemeMode, cycleThemeMode } from '../lib/theme.js';
 import { ProgressStore } from '../lib/progress.js';
 import { nextSchedule } from '../lib/sm2.js';
 import { contentIdentityFromQuestion } from '../lib/ident.js';
-import { sectionTitle, subelementTitle } from '../data/exam-banks.js';
+import { bankBlock, sectionTitle, subelementTitle } from '../data/exam-banks.js';
 import './question-card.js';
 import './chapter-list.js';
 import './book-cta.js';
 import './review-session.js';
 import './exam-session.js';
-import type { SectionStat } from './chapter-list.js';
+import type { SubjectBlock, SubsectionStat } from './chapter-list.js';
 
 type Tab = 'practice' | 'review' | 'exam';
 type View =
@@ -49,7 +49,8 @@ export class ExamShell extends LitElement {
   @state() tab: Tab = 'practice';
   @state() view: View = { kind: 'practice-pick' };
   /** Per-section progress for the chapter list (loaded from the store, async). */
-  @state() sectionStats: SectionStat[] = [];
+  @state() accessor sectionStats: SubsectionStat[] = [];
+  @state() accessor blocks: SubjectBlock[] = [];
 
   updated(changed: Map<string, unknown>): void {
     super.updated(changed);
@@ -70,8 +71,8 @@ export class ExamShell extends LitElement {
     if (!bank) return;
     const questions = bankData[bank.id] ?? [];
     const sectionOf = new Map<string, string>(questions.map(q => [contentIdentityFromQuestion(q), q.section]));
-    const totals = new Map<string, SectionStat>(
-      bank.sections.map(id => [id, { id, title: sectionTitle(bank.id, id), total: questions.filter(q => q.section === id).length, studied: 0, correct: 0 }]),
+    const totals = new Map<string, SubsectionStat>(
+      bank.sections.map(id => [id, { id, total: questions.filter(q => q.section === id).length, studied: 0, correct: 0 }]),
     );
     const records = await this.progress.bankRecords(bank.id);
     for (const r of records) {
@@ -81,7 +82,19 @@ export class ExamShell extends LitElement {
       if (r.correctCount > 0) stat.correct += 1;
     }
     // ignore a stale load (the bank changed while awaiting)
-    if (this.bank === bank) this.sectionStats = bank.sections.map(id => totals.get(id)!);
+    if (this.bank === bank) {
+      this.sectionStats = bank.sections.map(id => totals.get(id)!);
+      // two-level view: group the subsections under their subject block and
+      // title it (US banks: NCVEC group names; CA banks: the block map)
+      this.blocks = bank.sections.reduce<SubjectBlock[]>((acc, id) => {
+        const blockId = id.slice(0, 6);
+        const title = bankBlock(bank.id, blockId) ?? sectionTitle(bank.id, id);
+        const last = acc[acc.length - 1];
+        if (last && last.id === blockId) last.subsections.push(totals.get(id)!);
+        else acc.push({ id: blockId, title, subsections: [totals.get(id)!] });
+        return acc;
+      }, []);
+    }
   }
 
   static styles = css`
@@ -309,8 +322,8 @@ export class ExamShell extends LitElement {
   private renderPractice(): unknown {
     const v = this.view;
     if (v.kind === 'practice-pick') {
-      // sectionStats load asynchronously from the store — while empty (no
-      // data yet) the chapter list renders nothing: never fake zeros.
+      // block/section stats load asynchronously from the store — while empty
+      // (no data yet) the chapter list renders nothing: never fake zeros.
       const total = this.bank.questionCount;
       const seen = [...this.sectionStats.values()].reduce((a, b) => a + b.studied, 0);
       const readiness = Math.round((seen / total) * 100);
@@ -322,15 +335,11 @@ export class ExamShell extends LitElement {
           </div>
         </div>
         <chapter-list
-        .sections="${this.sectionStats}"
+        .blocks="${this.blocks}"
         @section-start="${(e: CustomEvent) => {
           const section = e.detail.section;
-          this.view = {
-            kind: 'practice',
-            questions: (bankData[this.bank.id] ?? []).filter(q => q.section === section),
-            index: 0,
-            section,
-          };
+          const qs = (bankData[this.bank.id] ?? []).filter(q => q.section === section);
+          this.view = { kind: 'practice', questions: qs, index: 0, section };
         }}"
       ></chapter-list>`;
     }

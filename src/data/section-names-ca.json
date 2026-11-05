@@ -1,0 +1,22 @@
+{
+  "$comment": "Subject-block titles for the ISED Canadian question banks, derived by the RadioBook team from each block's question content, as UI metadata. This file does not alter the ISED bank text (which ships verbatim).",
+  "ca-basic": {
+    "B-001": "Regulations and operating requirements",
+    "B-002": "Operating procedures and Q signals",
+    "B-003": "Station equipment: transmitters, receivers, power and RF safety",
+    "B-004": "Semiconductors and amplifiers",
+    "B-005": "Electrical principles: current, voltage, Ohm's law and resonance",
+    "B-006": "Feed lines, antennas and SWR",
+    "B-007": "Propagation and the ionosphere",
+    "B-008": "Interference and its reduction"
+  },
+  "ca-advanced": {
+    "A-001": "Circuits: time constants, resonance and Q",
+    "A-002": "Semiconductors, amplifiers and digital logic",
+    "A-003": "Measurements: oscilloscopes, meters and dip meters",
+    "A-004": "Power supplies: rectifiers and regulators",
+    "A-005": "Oscillators, SSB generation and digital modes",
+    "A-006": "Receivers: superheterodyne design and noise",
+    "A-007": "Antennas, transmission lines and impedance matching"
+  }
+}
