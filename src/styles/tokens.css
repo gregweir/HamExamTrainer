@@ -1,0 +1,39 @@
+/*
+ * Tartanleaf brand tokens.
+ * Palette values copied verbatim from the RadioBook suite
+ * (suite/index.html, src/shared/styles/variables.css).
+ */
+:root {
+  --tl-cream: #F4EFE5;
+  --tl-sage: #97A28A;
+  --tl-coral: #F58A6A;
+  --tl-slate: #255665;
+  --tl-navy: #173847;
+  --tl-teal: #2F5E5B;
+  --tl-light-sage: #C8D0C0;
+  --tl-stone: #EAE3D7;
+
+  /* Light-mode surfaces */
+  --tl-bg: var(--tl-cream);
+  --tl-surface: var(--tl-stone);
+  --tl-surface-elevated: var(--tl-light-sage);
+  --tl-text: var(--tl-navy);
+  --tl-text-muted: var(--tl-slate);
+  --tl-accent: var(--tl-teal);
+  --tl-accent-alt: var(--tl-coral);
+  --tl-border: rgba(23, 56, 71, 0.15);
+}
+
+/* Dark-mode surfaces (navy/slate/teal base) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tl-bg: var(--tl-navy);
+    --tl-surface: var(--tl-slate);
+    --tl-surface-elevated: var(--tl-teal);
+    --tl-text: var(--tl-cream);
+    --tl-text-muted: var(--tl-sage);
+    --tl-accent: var(--tl-coral);
+    --tl-accent-alt: var(--tl-teal);
+    --tl-border: rgba(244, 239, 229, 0.15);
+  }
+}

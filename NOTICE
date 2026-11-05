@@ -1,0 +1,26 @@
+NOTICE — Tartanleaf Ham Exam Trainer
+====================================
+
+This product (the application code in this repository) is licensed under the
+MIT License; see the LICENSE file.
+
+Question-pool data bundled under `data/` is covered by separate terms:
+
+US pools (Technician 2026-2030, General 2023-2027, Amateur Extra 2024-2028)
+  - Question text and figures originate from the NCVEC (National Conference of
+    Volunteer Examiner Coordinators) question pools, which are in the public
+    domain.
+  - The packaged JSON plus figure files are used from
+    https://github.com/russolsen/ham_radio_question_pool, which is licensed
+    under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0).
+    The pool content itself remains NCVEC public domain.
+
+Canadian pools (ISED Basic 984-question bank, re-based 2025-07-15; ISED
+Advanced bank)
+  - Subject to Crown copyright. Shipped verbatim, without alteration, as
+    downloaded from https://apc-cap.ic.gc.ca/datafiles/amat_basic_quest.zip
+    and https://apc-cap.ic.gc.ca/datafiles/amat_adv_quest.zip.
+    Source: Innovation, Science and Economic Development Canada (ISED),
+    Amateur Radio question banks.
+
+See `data/raw/SOURCES.md` for the full source list and fetch dates.
