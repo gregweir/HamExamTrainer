@@ -14,6 +14,7 @@ import './question-card.js';
 import './chapter-list.js';
 import './book-cta.js';
 import './review-session.js';
+import './exam-session.js';
 
 type Tab = 'practice' | 'review' | 'exam';
 type View =
@@ -186,10 +187,7 @@ export class ExamShell extends LitElement {
             class="tab"
             role="tab"
             aria-selected="${this.tab === t}"
-            ?disabled="${t === 'exam'}"
-            title="${t === 'exam' ? 'Arriving in a later build' : ''}"
             @click="${() => {
-              if (t === 'exam') return;
               this.tab = t;
               this.view = { kind: 'practice-pick' };
             }}"
@@ -203,7 +201,12 @@ export class ExamShell extends LitElement {
             .bank="${this.bank.id === 'ca-basic-honours' ? 'ca-basic' : this.bank.id}"
             .resolveQuestion="${(identity: string) => this.resolveQuestion(identity)}"
           ></review-session>
-        ` : html`<div class="placeholder">Arriving in a later build.</div>`}
+        ` : html`
+          <exam-session
+            .store="${this.progress}"
+            .bankId="${this.bank.id}"
+          ></exam-session>
+        `}
       </div>
       <book-cta
         .bookHref="${this.bank.bookCta.href}"

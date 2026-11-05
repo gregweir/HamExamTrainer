@@ -19,16 +19,16 @@ import './question-card.js';
  */
 @customElement('review-session')
 export class ReviewSession extends LitElement {
-  @property({ type: Object }) accessor store: ProgressStore | null = null;
-  @property({ type: String }) accessor bank = '';
-  @property({ type: Number }) accessor now = 0;
-  @property({ type: Object }) accessor resolveQuestion: ((identity: string) => Promise<ExamQuestion | null>) | null = null;
+  @property({ type: Object }) store: ProgressStore | null = null;
+  @property({ type: String }) bank = '';
+  @property({ type: Number }) now = 0;
+  @property({ type: Object }) resolveQuestion: ((identity: string) => Promise<ExamQuestion | null>) | null = null;
 
-  @state() accessor queue: { identity: string; record: ProgressRecord }[] = [];
-  @state() accessor position = 0;
-  @state() accessor current: ExamQuestion | null = null;
-  @state() accessor answeredCorrectly: (boolean | null)[] = [];
-  @state() accessor loaded = false;
+  @state() queue: { identity: string; record: ProgressRecord }[] = [];
+  @state() position = 0;
+  @state() current: ExamQuestion | null = null;
+  @state() answeredCorrectly: (boolean | null)[] = [];
+  @state() loaded = false;
 
   static styles = css`
     :host {
