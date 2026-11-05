@@ -31,9 +31,16 @@
   --tl-heading: var(--tl-navy);
 }
 
-/* Dark-mode surfaces (navy/slate/teal base) */
+/*
+ * Dark-mode surfaces (navy/slate/teal base), driven three ways:
+ *   - data-mode="dark" on :root forces dark (the in-app ◐ override)
+ *   - data-mode="light" on :root forces light under a system-dark OS
+ *   - otherwise the OS preference (prefers-color-scheme) applies.
+ * The suite's own preference is inherited through the theme module at mount
+ * (radiobook.ca shares its localStorage with /trainer/).
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-mode='light']) {
     --tl-bg: var(--tl-navy);
     --tl-surface: var(--tl-slate);
     --tl-surface-elevated: var(--tl-teal);
@@ -50,4 +57,22 @@
     --tl-bar-bg: #1d4258;
     --tl-heading: var(--tl-cream);
   }
+}
+
+:root[data-mode='dark'] {
+  --tl-bg: var(--tl-navy);
+  --tl-surface: var(--tl-slate);
+  --tl-surface-elevated: var(--tl-teal);
+  --tl-text: var(--tl-cream);
+  --tl-text-muted: var(--tl-sage);
+  --tl-accent: var(--tl-coral);
+  --tl-accent-alt: var(--tl-teal);
+  --tl-border: rgba(244, 239, 229, 0.15);
+  --tl-chrome-bg: var(--tl-slate);
+  --tl-choice-bg: #1d4258;
+  --tl-choice-bg-hover: #235067;
+  --tl-feedback-ok: #173f2a;
+  --tl-feedback-bad: #4a221a;
+  --tl-bar-bg: #1d4258;
+  --tl-heading: var(--tl-cream);
 }

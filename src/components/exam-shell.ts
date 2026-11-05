@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import logoUrl from '../assets/logo.jpg';
 import {
   BANKS,
   CA_ADVANCED,
@@ -10,6 +11,7 @@ import {
   type BankDefinition,
   type ExamQuestion,
 } from '../data/exam-banks.js';
+import { initialThemeMode, cycleThemeMode } from '../lib/theme.js';
 import { ProgressStore } from '../lib/progress.js';
 import { nextSchedule } from '../lib/sm2.js';
 import { contentIdentityFromQuestion } from '../lib/ident.js';
@@ -118,6 +120,19 @@ export class ExamShell extends LitElement {
       font-size: 11px;
       opacity: 0.75;
     }
+
+    .mode-btn {
+      background: transparent;
+      color: var(--tl-cream, #f4efe5);
+      border: 1px solid rgba(244, 239, 229, 0.3);
+      border-radius: 8px;
+      font-size: 15px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+
+    .mode-btn:hover { border-color: var(--tl-coral, #f58a6a); color: var(--tl-coral, #f58a6a); }
+    .mode-btn:focus-visible { outline: 3px solid var(--tl-coral, #f58a6a); outline-offset: 2px; }
 
     .bank-chooser {
       margin-left: auto;
@@ -234,11 +249,16 @@ export class ExamShell extends LitElement {
   protected render(): unknown {
     return html`
       <div class="brandbar">
-        <img class="brand-logo" src="/trainer/assets/logo.jpg" alt="Tartanleaf">
+        <img class="brand-logo" src="${logoUrl}" alt="Tartanleaf">
         <div>
           <div class="brand-name">Tartanleaf Ham Exam Trainer</div>
           <div class="brand-sub">${this.bank.subtitle}</div>
         </div>
+        <button
+          class="mode-btn"
+          aria-label="Switch between light and dark mode"
+          @click="${function () { document.documentElement.dataset.mode = cycleThemeMode(); }}"
+        >◐</button>
         <select
           class="bank-chooser"
           aria-label="Choose an exam"
