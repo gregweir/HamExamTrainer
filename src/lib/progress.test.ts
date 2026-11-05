@@ -8,7 +8,9 @@ describe('ProgressStore', () => {
   let store: ProgressStore;
 
   beforeEach(async () => {
-    store = new ProgressStore('test-db');
+    // a unique name per test: reset() cannot complete deleting a DB while a
+    // previous test's open connection still blocks it
+    store = new ProgressStore('test-db-' + Math.random().toString(36).slice(2));
     await store.reset();
   });
 
@@ -60,12 +62,32 @@ describe('ProgressStore', () => {
   it('exports and imports everything as portable JSON', async () => {
     const k = key('us-tech', 'T1A', 'What is a dipole?');
     await store.recordAnswer(k, true, 1000, { intervalDays: 4, dueAt: 5000 });
+    await store.saveExamAttempt({
+      id: 1700000000000, bank: 'us-tech', submittedAt: 1700000060000,
+      correct: 30, total: 35, percent: 85, passed: true,
+    });
     const dump = await store.exportAll();
     expect(dump.records[k]).not.toBeNull();
+    expect(dump.attempts).toHaveLength(1);
     // a fresh store importing the dump must see the same record
     const fresh = new ProgressStore('test-db-2');
     await fresh.reset();
     await fresh.importAll(JSON.parse(JSON.stringify(dump)));
     expect((await fresh.getRecord(k))?.intervalDays).toBe(4);
+    expect((await fresh.bankAttempts('us-tech'))[0]?.percent).toBe(85);
+  });
+
+  it('stores, lists and limits mock-exam verdicts, newest first, per bank', async () => {
+    const mk = (id: number, bank: string, percent: number, passed: boolean, honours = false) => ({
+      id, bank, submittedAt: id + 60_000, correct: percent, total: 100, percent, passed, honours,
+    });
+    await store.saveExamAttempt(mk(3_000, 'us-tech', 62, false));
+    await store.saveExamAttempt(mk(1_000, 'us-tech', 74, true));
+    await store.saveExamAttempt(mk(2_000, 'ca-basic', 80, true, true));
+    const us = await store.bankAttempts('us-tech');
+    expect(us.map(a => a.id)).toEqual([3_000, 1_000]); // newest first by submittedAt
+    const ca = await store.bankAttempts('ca-basic');
+    expect(ca[0]!.honours).toBe(true);
+    expect(ca.map(a => a.id)).toEqual([2_000]);
   });
 });

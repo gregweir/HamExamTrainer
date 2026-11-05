@@ -139,10 +139,17 @@ describe('exam-session verdict counts unanswered as incorrect', () => {
 /** The session flow (uses the real bank + a stub store). */
 class StubStore {
   sessions: Record<string, unknown> = {};
+  attempts: any[] = [];
   async loadExamSession(bank: string) { return (this.sessions[bank] ?? null) as never; }
   async saveExamSession(s: unknown) { this.sessions[(s as any).bank] = s; }
   async clearExamSession(bank: string) { delete this.sessions[bank]; }
   async recordAnswer() {}
+  async saveExamAttempt(a: any) { this.attempts.push({ ...a }); }
+  async bankAttempts(bank: string, limit = 10) {
+    return this.attempts.filter(a => a.bank === bank)
+      .sort((a, b) => b.submittedAt - a.submittedAt)
+      .slice(0, limit);
+  }
 }
 
 describe('exam-session flow', () => {
@@ -163,5 +170,56 @@ describe('exam-session flow', () => {
     expect(card, 'exam question card rendered').not.toBeNull();
     // saved session exists (resumable)
     expect(store.sessions['us-tech']).not.toBeNull();
+  });
+
+  it('a submitted paper persists its verdict as an exam attempt', async () => {
+    const confirm = vi.fn(() => true);
+    (window as any).confirm = confirm;
+    const store = new StubStore();
+    const el: any = await fixture(html`<exam-session .store="${store}" .bankId="${'us-tech'}"></exam-session>`);
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 20));
+    await el.updateComplete;
+    el.shadowRoot.querySelector('button.primary').click(); // start
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 30));
+    await el.updateComplete;
+    const submit = [...el.shadowRoot.querySelectorAll('button.primary')]
+      .find(b => b.textContent === 'Submit exam') as HTMLButtonElement;
+    submit!.click();
+    await Promise.resolve(); // flush the confirm + save microtasks
+    await new Promise(r => setTimeout(r, 30));
+    expect(confirm).toHaveBeenCalled();
+    const attempt = store.attempts[0]!;
+    expect(attempt.bank).toBe('us-tech');
+    expect(attempt.total).toBe(35); // the whole paper, unanswered included
+    expect(attempt.correct).toBe(0);
+    expect(attempt.percent).toBe(0);
+    expect(attempt.passed).toBe(false);
+  });
+
+  it('the intro lists past attempts for the bank, newest first', async () => {
+    const store = new StubStore();
+    await store.saveExamAttempt({
+      id: 1000, bank: 'us-tech', submittedAt: Date.now() - 86_400_000,
+      correct: 30, total: 35, percent: 85, passed: true,
+    });
+    const el: any = await fixture(html`<exam-session .store="${store}" .bankId="${'us-tech'}"></exam-session>`);
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 40));
+    await el.updateComplete;
+    const text = el.shadowRoot.textContent;
+    expect(text).toContain('85%');
+    expect(text).toContain('PASS');
+    // the attempt count chips in the history header
+    expect(text).toContain('Previous attempts');
+    // a verdict from another bank does not leak into the list
+    await store.saveExamAttempt({
+      id: 1001, bank: 'ca-basic', submittedAt: Date.now(),
+      correct: 80, total: 100, percent: 80, passed: true, honours: true,
+    });
+    el.attempts = await store.bankAttempts('us-tech');
+    await el.updateComplete;
+    expect(el.shadowRoot.textContent).not.toContain('HONOURS');
   });
 });

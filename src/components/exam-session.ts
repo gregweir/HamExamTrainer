@@ -10,7 +10,7 @@ import {
   type BankDefinition,
   type ExamQuestion,
 } from '../data/exam-banks.js';
-import type { ProgressStore, ExamSession as StoredSession } from '../lib/progress.js';
+import type { ProgressStore, ExamSession as StoredSession, ExamAttempt } from '../lib/progress.js';
 import { contentIdentityFromQuestion } from '../lib/ident.js';
 import './question-card.js';
 
@@ -54,6 +54,7 @@ export class ExamSession extends LitElement {
   @state() session: StoredSession | null = null;
   @state() submitted = false;
   @state() started = false;
+  @state() attempts: ExamAttempt[] = [];
 
   static styles = css`
     :host {
@@ -144,6 +145,46 @@ export class ExamSession extends LitElement {
       text-align: left;
       font-family: var(--font-mono, monospace);
     }
+
+    .history {
+      margin-top: 16px;
+      border: 1px solid var(--tl-border, #e5e0d5);
+      border-radius: 12px;
+      background: var(--tl-surface, #fff);
+      padding: 16px 20px;
+    }
+    .history h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: var(--tl-heading, #173847);
+    }
+    .history ul { list-style: none; margin: 0; padding: 0; }
+    .history li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--tl-border, #e5e0d5);
+      font-size: 13px;
+    }
+    .history li:last-child { border-bottom: none; }
+    .when {
+      font-family: var(--font-mono, monospace);
+      color: var(--tl-text-muted, #255665);
+      min-width: 118px;
+    }
+    .chip {
+      font-family: var(--font-mono, monospace);
+      font-size: 11px;
+      border-radius: 999px;
+      padding: 2px 10px;
+      background: var(--tl-bar-bg);
+      color: var(--tl-text, #173847);
+      font-weight: 700;
+    }
+    .chip.ok { background: var(--tl-feedback-ok, #eaf6ee); color: #1c6b38; }
+    .chip.bad { background: var(--tl-feedback-bad, #f9ece8); color: #a33d22; }
+    .chip.honours { background: var(--tl-accent, #2f5e5b); color: var(--tl-cream, #f4efe5); }
   `;
 
   /* ------------------------- static pure logic ------------------------- */
@@ -235,7 +276,15 @@ export class ExamSession extends LitElement {
     // resume a saved session once the bank is known
     if (this.bank && !this.started && !this.submitted && (changed.has('store') || changed.has('bankId'))) {
       void this.tryResume();
+      void this.refreshAttempts();
     }
+  }
+
+  private async refreshAttempts(): Promise<void> {
+    const bank = this.bank;
+    if (!bank || !this.store) return;
+    const list = await this.store.bankAttempts(bank.id);
+    if (this.bank === bank) this.attempts = list;
   }
 
   private async tryResume(): Promise<void> {
@@ -314,8 +363,51 @@ export class ExamSession extends LitElement {
       );
       if (!proceed) return;
     }
-    this.submitted = true;
+    // archive the verdict before the session is cleared
+    const t = this.tally();
+    await this.store?.saveExamAttempt({
+      id: t.startedAt,
+      bank: s.bank,
+      submittedAt: Date.now(),
+      correct: t.right,
+      total: t.total,
+      percent: t.v.percent,
+      passed: t.v.passed,
+      honours: t.v.honours || undefined,
+    });
     await this.store?.clearExamSession(s.bank);
+    this.submitted = true;
+    void this.refreshAttempts();
+  }
+
+  /** Count the paper like a real examiner: unanswered grades incorrect. */
+  private tally(): {
+    startedAt: number; right: number; total: number; unanswered: number;
+    sectionRows: Record<string, { right: number; total: number }>;
+    v: ReturnType<typeof ExamSession.verdict>;
+  } {
+    const s = this.session!;
+    const bank = this.bank!;
+    const total = s.questionIdentities.length;
+    const sectionRows: Record<string, { right: number; total: number }> = {};
+    let right = 0;
+    let unanswered = 0;
+    s.answers.forEach((a, idx) => {
+      const identity = s.questionIdentities[idx]!;
+      const q = this.questions().find(bq => identityOf(bq) === identity);
+      if (a === null) {
+        // unanswered = not counted as correct — but it already sits in `total`
+        unanswered += 1;
+        return;
+      }
+      if (!q) return; // the question left the bank; it still counts as attempted-incorrect in `total`
+      const isRight = a === q.correctIndex;
+      if (isRight) right += 1;
+      const row = (sectionRows[q.section] ??= { right: 0, total: 0 });
+      row.total += 1;
+      if (isRight) row.right += 1;
+    });
+    return { startedAt: s.startedAt, right, total, unanswered, sectionRows, v: ExamSession.verdict(bank, right, total) };
   }
 
   private async abandon(): Promise<void> {
@@ -323,6 +415,7 @@ export class ExamSession extends LitElement {
     this.started = false;
     this.session = null;
     this.submitted = false;
+    void this.refreshAttempts();
   }
 
   protected render() {
@@ -340,6 +433,20 @@ export class ExamSession extends LitElement {
           </p>
           <button class="primary" @click="${() => void this.startExam()}">Start the exam</button>
         </div>
+        ${this.attempts.length ? html`
+          <div class="history">
+            <h3>Previous attempts</h3>
+            <ul>
+              ${this.attempts.map(a => html`
+                <li>
+                  <span class="when">${new Date(a.submittedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                  <span class="chip ${a.passed ? 'ok' : 'bad'}">${a.percent}% ${a.passed ? 'PASS' : 'FAIL'}</span>
+                  ${a.honours ? html`<span class="chip honours">HONOURS</span>` : nothing}
+                </li>
+              `)}
+            </ul>
+          </div>
+        ` : nothing}
       `;
     }
     return this.renderRunning();
@@ -371,27 +478,8 @@ export class ExamSession extends LitElement {
 
   private renderVerdict() {
     const bank = this.bank!;
-    const s = this.session!;
-    const total = s.questionIdentities.length;
-    const sectionRows: Record<string, { right: number; total: number }> = {};
-    let right = 0;
-    let unanswered = 0;
-    s.answers.forEach((a, idx) => {
-      const identity = s.questionIdentities[idx]!;
-      const q = this.questions().find(bq => identityOf(bq) === identity);
-      if (a === null) {
-        // unanswered = not counted as correct — but it already sits in `total`
-        unanswered += 1;
-        return;
-      }
-      if (!q) return; // the question left the bank; it still counts as attempted-incorrect in `total`
-      const isRight = a === q.correctIndex;
-      if (isRight) right += 1;
-      const row = (sectionRows[q.section] ??= { right: 0, total: 0 });
-      row.total += 1;
-      if (isRight) row.right += 1;
-    });
-    const v = ExamSession.verdict(bank, right, total);
+    const t = this.tally();
+    const { sectionRows, right, total, unanswered, v } = t;
     return html`
       <div class="verdict" role="status">
         <div class="big ${v.passed ? 'pass' : 'fail'}">${Math.round(v.percent)}% — ${v.passed ? 'PASS' : 'FAIL'}</div>
