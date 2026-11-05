@@ -13,6 +13,7 @@ import { contentIdentityFromQuestion } from '../lib/ident.js';
 import './question-card.js';
 import './chapter-list.js';
 import './book-cta.js';
+import './review-session.js';
 
 type Tab = 'practice' | 'review' | 'exam';
 type View =
@@ -185,10 +186,10 @@ export class ExamShell extends LitElement {
             class="tab"
             role="tab"
             aria-selected="${this.tab === t}"
-            ?disabled="${t !== 'practice'}"
-            title="${t !== 'practice' ? 'Arriving in a later build' : ''}"
+            ?disabled="${t === 'exam'}"
+            title="${t === 'exam' ? 'Arriving in a later build' : ''}"
             @click="${() => {
-              if (t !== 'practice') return;
+              if (t === 'exam') return;
               this.tab = t;
               this.view = { kind: 'practice-pick' };
             }}"
@@ -196,7 +197,13 @@ export class ExamShell extends LitElement {
         `)}
       </div>
       <div class="content">
-        ${this.tab === 'practice' ? this.renderPractice() : html`<div class="placeholder">Arriving in a later build.</div>`}
+        ${this.tab === 'practice' ? this.renderPractice() : this.tab === 'review' ? html`
+          <review-session
+            .store="${this.progress}"
+            .bank="${this.bank.id === 'ca-basic-honours' ? 'ca-basic' : this.bank.id}"
+            .resolveQuestion="${(identity: string) => this.resolveQuestion(identity)}"
+          ></review-session>
+        ` : html`<div class="placeholder">Arriving in a later build.</div>`}
       </div>
       <book-cta
         .bookHref="${this.bank.bookCta.href}"
@@ -245,6 +252,10 @@ export class ExamShell extends LitElement {
   }
 
   /* ------------------------------ practice ------------------------------ */
+
+  private async resolveQuestion(identity: string): Promise<ExamQuestion | null> {
+    return bankData[this.bank.id]?.find(q => contentIdentityFromQuestion(q) === identity) ?? null;
+  }
 
   private async handleAnswered(q: ExamQuestion, correct: boolean): Promise<void> {
     const now = Date.now();
