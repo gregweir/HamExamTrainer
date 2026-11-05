@@ -71,6 +71,33 @@ describe('review-session', () => {
     expect(updated.lastStudiedAt).toBe(10_000);
   });
 
+  it('keyboard: 1-4 grade the answered card (Again/Hard/Good/Easy)', async () => {
+    const store = new StubStore();
+    const DIP_IDENTITY = contentIdentity('us-tech', 'T1A', DIPOLE_Q);
+    store.records[DIP_IDENTITY] = seedRecord(DIPOLE_Q, 2.5, 1, 1000);
+    const el = await fixture<any>(html`<review-session></review-session>`);
+    el.store = store;
+    el.bank = 'us-tech';
+    el.now = 10_000;
+    await el.updateComplete;
+    for (let i = 0; i < 20 && !el.shadowRoot.querySelector('question-card'); i++) {
+      await new Promise(r => setTimeout(r, 25));
+      await el.updateComplete;
+    }
+    const card = el.shadowRoot.querySelector('question-card');
+    // a wrong answer first (any answer enables the grade row)
+    [...card!.shadowRoot.querySelectorAll('button.choice')][1]!.click();
+    await card!.updateComplete;
+    await el.updateComplete;
+    // key 1 = Again (SM-2 quality 1): a lapse, so the interval resets to 1 day
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '1' }));
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 10));
+    await el.updateComplete;
+    expect((store.records[DIP_IDENTITY] as any).intervalDays).toBe(1);
+    expect((store.records[DIP_IDENTITY] as any).ease).toBeLessThan(2.5);
+  });
+
   it('shows the empty state when nothing is due', async () => {
     const store = new StubStore();
     const el = await fixture<any>(html`<review-session></review-session>`);

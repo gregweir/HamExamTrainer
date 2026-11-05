@@ -153,6 +153,33 @@ class StubStore {
 }
 
 describe('exam-session flow', () => {
+  it('keyboard: ArrowLeft/ArrowRight step through the paper while it runs', async () => {
+    const store = new StubStore();
+    const el: any = await fixture(html`<exam-session .store="${store}" .bankId="${'us-tech'}"></exam-session>`);
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 20));
+    await el.updateComplete;
+    // nothing before the exam starts: arrows must not throw or move anywhere
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    expect(el.started).toBe(false);
+    el.shadowRoot.querySelector('button.primary').click(); // start
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 20));
+    await el.updateComplete;
+    const s = el.session;
+    expect(s.position).toBe(0);
+    // at the first question ArrowLeft stays put, ArrowRight moves forward
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+    await el.updateComplete;
+    expect(el.session.position).toBe(0);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    await el.updateComplete;
+    expect(el.session.position).toBe(1);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+    await el.updateComplete;
+    expect(el.session.position).toBe(0);
+  });
+
   it('renders examLength questions with a submit; resume restores a saved session', async () => {
     const store = new StubStore();
     const el: any = await fixture(html`<exam-session .store="${store}" .bankId="${'us-tech'}"></exam-session>`);

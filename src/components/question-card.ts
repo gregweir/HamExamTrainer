@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type { ExamQuestion } from '../data/exam-banks.js';
+import { inFormControl, onWindowKey } from '../lib/keys.js';
 
 /**
  * One study question: text, optional figure, four choices, instant feedback
@@ -23,6 +24,7 @@ export class QuestionCard extends LitElement {
 
   @state() private pickedIndex: number | null = null;
   @state() private advanceRequested = false;
+  private keyOff: (() => void) | null = null;
 
   static styles = css`
     :host {
@@ -183,9 +185,11 @@ export class QuestionCard extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
-    // Keyboard: 1-4 pick a choice, Enter advances (after answering).
-    this.shadowRoot?.addEventListener('keydown', ((e: Event) => {
-      const ke = e as KeyboardEvent;
+    // Keyboard (global, this is the only live question card): 1-4 or A-D
+    // pick a choice, Enter advances (after answering). Form-control guard
+    // keeps typing in the chooser and friends from driving the card.
+    this.keyOff = onWindowKey((ke) => {
+      if (inFormControl(ke)) return;
       const letterIdx = ['a', 'b', 'c', 'd'].indexOf(ke.key.toLowerCase());
       const digitIdx = ['1', '2', '3', '4'].indexOf(ke.key);
       if (letterIdx >= 0 || digitIdx >= 0) {
@@ -197,7 +201,13 @@ export class QuestionCard extends LitElement {
       } else if (ke.key === 'Enter') {
         this.requestNext();
       }
-    }) as EventListener);
+    });
+  }
+
+  disconnectedCallback(): void {
+    this.keyOff?.();
+    this.keyOff = null;
+    super.disconnectedCallback();
   }
 
   protected render() {

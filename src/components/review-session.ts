@@ -3,6 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import type { ExamQuestion } from '../data/exam-banks.js';
 import type { ProgressStore, ProgressRecord } from '../lib/progress.js';
 import { nextSchedule } from '../lib/sm2.js';
+import { inFormControl, onWindowKey } from '../lib/keys.js';
 import './question-card.js';
 
 /**
@@ -29,6 +30,30 @@ export class ReviewSession extends LitElement {
   @state() current: ExamQuestion | null = null;
   @state() answeredCorrectly: (boolean | null)[] = [];
   @state() loaded = false;
+
+  private keyOff: (() => void) | null = null;
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    // grade keys: 1-4 map onto Again/Hard/Good/Easy (SM-2 qualities 1/3/4/5)
+    // once the card is answered; before that the digits answer the question
+    this.keyOff = onWindowKey((ke) => {
+      if (inFormControl(ke)) return;
+      const qualities = [1, 3, 4, 5];
+      const idx = ['1', '2', '3', '4'].indexOf(ke.key);
+      if (idx < 0) return;
+      const item = this.queue[this.position];
+      if (!item || this.answeredCorrectly[this.position] === null) return;
+      void this.grade(qualities[idx]!);
+      ke.preventDefault();
+    });
+  }
+
+  disconnectedCallback(): void {
+    this.keyOff?.();
+    this.keyOff = null;
+    super.disconnectedCallback();
+  }
 
   static styles = css`
     :host {
@@ -59,6 +84,13 @@ export class ReviewSession extends LitElement {
 
     button.grade:hover { border-color: var(--tl-sage, #97a28a); }
     button.grade:focus-visible { outline: 3px solid var(--tl-teal, #2f5e5b); outline-offset: 2px; }
+
+    button.grade kbd {
+      font-family: var(--font-mono, monospace);
+      font-size: 10px;
+      opacity: 0.6;
+      margin-left: 2px;
+    }
 
     button.grade[data-quality='1'] { background: #f9ece8; border-color: #d8a79a; }
     button.grade[data-quality='4'] { background: #eaf6ee; border-color: #a7c9b1; }
@@ -146,10 +178,10 @@ export class ReviewSession extends LitElement {
         ></question-card>
         ${answered ? html`
           <div class="grades" role="group" aria-label="How well did you know it?">
-            <button class="grade" data-quality="1" @click="${() => void this.grade(1)}">Again</button>
-            <button class="grade" data-quality="3" @click="${() => void this.grade(3)}">Hard</button>
-            <button class="grade" data-quality="4" @click="${() => void this.grade(4)}">Good</button>
-            <button class="grade" data-quality="5" @click="${() => void this.grade(5)}">Easy</button>
+            <button class="grade" data-quality="1" title="Key 1" @click="${() => void this.grade(1)}">Again <kbd>1</kbd></button>
+            <button class="grade" data-quality="3" title="Key 2" @click="${() => void this.grade(3)}">Hard <kbd>2</kbd></button>
+            <button class="grade" data-quality="4" title="Key 3" @click="${() => void this.grade(4)}">Good <kbd>3</kbd></button>
+            <button class="grade" data-quality="5" title="Key 4" @click="${() => void this.grade(5)}">Easy <kbd>4</kbd></button>
           </div>
         ` : nothing}
       ` : html`<div class="empty">This question is no longer in the bank — skipped.</div>`}

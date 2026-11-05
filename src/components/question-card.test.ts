@@ -69,17 +69,28 @@ describe('question-card', () => {
     expect(next).not.toBeNull(); // next appears after answering
   });
 
-  it('keyboard: 1-4 pick, Enter advances', async () => {
+  it('keyboard (window-level): 1-4 pick, Enter advances', async () => {
     const el = await fixture<QuestionCard>(html`<question-card .question="${baseQ}"></question-card>`);
     await el.updateComplete;
-    el.shadowRoot!.dispatchEvent(new KeyboardEvent('keydown', { key: '4', bubbles: true, composed: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '4' }));
     await el.updateComplete;
     const buttons = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('button.choice')];
     expect(buttons[3]!.classList.contains('right')).toBe(true);
     expect(el.shadowRoot!.querySelector('button.next')).not.toBeNull();
-    el.shadowRoot!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     await el.updateComplete;
     expect(el.shadowRoot!.querySelector('button.next')).toBeNull(); // next question requested
+  });
+
+  it('keyboard is inert while focus sits in a form control', async () => {
+    const el = await fixture<QuestionCard>(html`<question-card .question="${baseQ}"></question-card>`);
+    await el.updateComplete;
+    const e = new KeyboardEvent('keydown', { key: '1', cancelable: true });
+    Object.defineProperty(e, 'target', { value: { tagName: 'SELECT', closest: () => null } });
+    window.dispatchEvent(e);
+    await el.updateComplete;
+    const buttons = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('button.choice')];
+    expect(buttons[0]!.classList.contains('wrong')).toBe(false);
   });
 
   it('without an explanation nothing about explanations renders', async () => {

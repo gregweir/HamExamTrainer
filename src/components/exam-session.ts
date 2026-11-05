@@ -12,6 +12,7 @@ import {
 } from '../data/exam-banks.js';
 import type { ProgressStore, ExamSession as StoredSession, ExamAttempt } from '../lib/progress.js';
 import { contentIdentityFromQuestion } from '../lib/ident.js';
+import { inFormControl, onWindowKey } from '../lib/keys.js';
 import './question-card.js';
 
 /** Bank questions by id (the shipped v1 banks; parked banks resolve empty). */
@@ -267,6 +268,24 @@ export class ExamSession extends LitElement {
   /* ------------------------------ component ------------------------------ */
 
   private identityOf = identityOf;
+
+  private keyOff: (() => void) | null = null;
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    // while this exam runs, the arrow keys step through the paper
+    this.keyOff = onWindowKey((ke) => {
+      if (inFormControl(ke) || !this.started || this.submitted || !this.session) return;
+      if (ke.key === 'ArrowLeft') { void this.moveTo(this.session.position - 1); }
+      else if (ke.key === 'ArrowRight') { void this.moveTo(this.session.position + 1); }
+    });
+  }
+
+  disconnectedCallback(): void {
+    this.keyOff?.();
+    this.keyOff = null;
+    super.disconnectedCallback();
+  }
 
   updated(changed: Map<string, unknown>): void {
     super.updated(changed);
