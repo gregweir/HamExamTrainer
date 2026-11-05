@@ -34,7 +34,7 @@ export class ReviewSession extends LitElement {
     :host {
       display: block;
       font-family: var(--font-body, system-ui, sans-serif);
-      color: var(--tl-navy, #173847);
+      color: var(--tl-text, #173847);
     }
 
     .heading { font-size: 15px; font-weight: 600; margin: 4px 0 10px; }
@@ -48,8 +48,8 @@ export class ReviewSession extends LitElement {
 
     button.grade {
       border: 1px solid var(--tl-border, #e5e0d5);
-      background: var(--tl-stone, #eae3d7);
-      color: var(--tl-navy, #173847);
+      background: var(--tl-choice-bg);
+      color: var(--tl-text, #173847);
       border-radius: 8px;
       padding: 10px 20px;
       font-size: 14px;
@@ -66,7 +66,7 @@ export class ReviewSession extends LitElement {
     .empty {
       text-align: center;
       padding: 28px 14px;
-      color: var(--tl-slate, #255665);
+      color: var(--tl-text-muted, #255665);
       background: var(--tl-surface, #fff);
       border: 1px solid var(--tl-border, #e5e0d5);
       border-radius: 12px;

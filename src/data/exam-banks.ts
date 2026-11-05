@@ -6,6 +6,7 @@
 
 import caBasicData from './banks/ca-basic.json';
 import usTechData from './banks/us-tech.json';
+import syllabus from './us-tech-syllabus.json';
 
 /**
  * Bank ids, mirroring the spec's union. Only the SHIPPED banks may appear in
@@ -68,10 +69,28 @@ export const US_TECH = usTechData as unknown as ExamQuestion[];
 /** Canadian Basic (ISED), EN-only view of the bilingual rows. */
 export const CA_BASIC = caBasicData as unknown as CaExamQuestion[];
 
-/** Section list in first-appearance (syllabus) order, derived from the data itself. */
+/** Section list in first-appearance (syllabus) order, from the data. */
 const sectionsOf = (questions: ExamQuestion[]): string[] => [
   ...new Set(questions.map((q) => q.section)),
 ];
+
+/** The official NCVEC syllabus names (public domain); US banks only. */
+const usTechGroups = (syllabus as { groups: Record<string, string>; subelements: Record<string, string> });
+
+/** Human-readable section title; US banks come from the NCVEC syllabus, CA banks fall back to the group id (ISED data carries no group titles). */
+export function sectionTitle(bankId: ExamBankId, section: string): string {
+  if (bankId.startsWith('us')) {
+    return usTechGroups.groups[section] ?? section;
+  }
+  return section;
+}
+
+/** Subelement heading for a section (e.g. T1A → 'COMMISSION\'S RULES'). */
+export function subelementTitle(bankId: ExamBankId, section: string): string | null {
+  if (!bankId.startsWith('us')) return null;
+  const sub = section.slice(0, 2);
+  return usTechGroups.subelements[sub] ?? null;
+}
 
 /**
  * v1 shipped registry.

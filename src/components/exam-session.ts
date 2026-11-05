@@ -53,7 +53,7 @@ export class ExamSession extends LitElement {
     :host {
       display: block;
       font-family: var(--font-body, system-ui, sans-serif);
-      color: var(--tl-navy, #173847);
+      color: var(--tl-text, #173847);
     }
 
     .intro {
@@ -65,7 +65,7 @@ export class ExamSession extends LitElement {
     }
 
     .intro h2 { margin: 0 0 10px; font-size: 20px; }
-    .intro p { margin: 0 0 22px; color: var(--tl-slate, #255665); font-size: 14px; line-height: 1.5; }
+    .intro p { margin: 0 0 22px; color: var(--tl-text-muted, #255665); font-size: 14px; line-height: 1.5; }
     .intro .resume-note { color: var(--tl-coral, #f58a6a); }
 
     button.primary {
@@ -89,7 +89,7 @@ export class ExamSession extends LitElement {
       margin-bottom: 12px;
       font-family: var(--font-mono, monospace);
       font-size: 13px;
-      color: var(--tl-slate, #255665);
+      color: var(--tl-text-muted, #255665);
     }
 
     question-card { margin-bottom: 12px; }
@@ -113,8 +113,8 @@ export class ExamSession extends LitElement {
     .honours {
       margin-top: 10px;
       display: inline-block;
-      background: var(--tl-light-sage, #c8d0c0);
-      color: var(--tl-navy, #173847);
+      background: var(--tl-bar-bg);
+      color: var(--tl-text, #173847);
       border-radius: 6px;
       padding: 4px 12px;
       font-size: 13px;

@@ -38,14 +38,15 @@ export class QuestionCard extends LitElement {
     .section-tag {
       font-family: var(--font-mono, monospace);
       font-size: 12px;
-      color: var(--tl-slate, #255665);
+      color: var(--tl-text-muted, #255665);
       letter-spacing: 0.05em;
     }
 
     .question-text {
-      font-size: 17px;
-      line-height: 1.5;
-      margin: 8px 0 20px;
+      font-size: 19px;
+      line-height: 1.55;
+      margin: 10px 0 24px;
+      font-family: var(--font-question, Georgia, 'Times New Roman', serif);
     }
 
     .choices {
@@ -64,7 +65,7 @@ export class QuestionCard extends LitElement {
       padding: 12px 14px;
       border-radius: 8px;
       border: 2px solid var(--tl-border, #e5e0d5);
-      background: var(--tl-stone, #eae3d7);
+      background: var(--tl-choice-bg);
       color: inherit;
       cursor: pointer;
       transition: border-color 0.15s, background 0.15s;
@@ -82,7 +83,7 @@ export class QuestionCard extends LitElement {
     button.choice .key {
       font-family: var(--font-mono, monospace);
       font-size: 12px;
-      color: var(--tl-slate, #255665);
+      color: var(--tl-text-muted, #255665);
       flex: 0 0 auto;
     }
 
@@ -101,20 +102,30 @@ export class QuestionCard extends LitElement {
     }
 
     .feedback {
-      margin-top: 16px;
-      border-radius: 8px;
-      padding: 12px 14px;
+      margin-top: 20px;
+      border-radius: 10px;
+      padding: 14px 16px;
       font-size: 14px;
-      line-height: 1.5;
+      line-height: 1.6;
+      animation: settle 0.25s ease-out;
     }
 
-    .feedback.correct { background: #eaf6ee; border-left: 4px solid #2f8f4e; }
-    .feedback.incorrect { background: #f9ece8; border-left: 4px solid #c74e31; }
+    @keyframes settle {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .feedback { animation: none; }
+    }
+
+    .feedback.correct { background: var(--tl-feedback-ok); border-left: 4px solid #2f8f4e; }
+    .feedback.incorrect { background: var(--tl-feedback-bad); border-left: 4px solid #c74e31; }
 
     .explanation {
       margin-top: 10px;
       font-size: 13px;
-      color: var(--tl-slate, #255665);
+      color: var(--tl-text-muted, #255665);
     }
 
     .refs {
@@ -129,8 +140,8 @@ export class QuestionCard extends LitElement {
       font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      background: var(--tl-light-sage, #c8d0c0);
-      color: var(--tl-navy, #173847);
+      background: var(--tl-bar-bg);
+      color: var(--tl-text, #173847);
       border-radius: 4px;
       padding: 1px 6px;
       margin-left: 8px;
@@ -166,10 +177,12 @@ export class QuestionCard extends LitElement {
     // Keyboard: 1-4 pick a choice, Enter advances (after answering).
     this.shadowRoot?.addEventListener('keydown', ((e: Event) => {
       const ke = e as KeyboardEvent;
-      if (['1', '2', '3', '4'].includes(ke.key)) {
-        const idx = Number(ke.key) - 1;
+      const letterIdx = ['a', 'b', 'c', 'd'].indexOf(ke.key.toLowerCase());
+      const digitIdx = ['1', '2', '3', '4'].indexOf(ke.key);
+      if (letterIdx >= 0 || digitIdx >= 0) {
+        const idx = letterIdx >= 0 ? letterIdx : digitIdx;
         const buttons = this.shadowRoot?.querySelectorAll<HTMLButtonElement>('button.choice');
-        if (buttons && !buttons[idx]?.disabled) {
+        if (idx >= 0 && buttons && !buttons[idx]?.disabled) {
           (buttons[idx] as HTMLButtonElement).click();
         }
       } else if (ke.key === 'Enter') {
@@ -204,7 +217,7 @@ export class QuestionCard extends LitElement {
               ?disabled="${answered}"
               @click="${() => this.pick(i)}"
             >
-              <span class="key">${i + 1}</span>
+              <span class="key">${String.fromCharCode(65 + i)}</span>
               <span>${choice}</span>
             </button>
           `;

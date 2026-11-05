@@ -22,13 +22,13 @@ export class BookCta extends LitElement {
       font-family: var(--font-body, system-ui, sans-serif);
       font-size: 13px;
       padding: 12px 18px;
-      background: var(--tl-light-sage, #c8d0c0);
+      background: var(--tl-bar-bg);
       border-radius: 10px;
-      color: var(--tl-navy, #173847);
+      color: var(--tl-text, #173847);
     }
 
     a {
-      color: var(--tl-slate, #255665);
+      color: var(--tl-text-muted, #255665);
       font-weight: 600;
       text-decoration: underline;
       text-underline-offset: 2px;

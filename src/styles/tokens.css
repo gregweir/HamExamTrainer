@@ -22,6 +22,13 @@
   --tl-accent: var(--tl-teal);
   --tl-accent-alt: var(--tl-coral);
   --tl-border: rgba(23, 56, 71, 0.15);
+  --tl-chrome-bg: var(--tl-slate);
+  --tl-choice-bg: #ffffff;
+  --tl-choice-bg-hover: #f7f3ea;
+  --tl-feedback-ok: #eaf6ee;
+  --tl-feedback-bad: #f9ece8;
+  --tl-bar-bg: var(--tl-light-sage);
+  --tl-heading: var(--tl-navy);
 }
 
 /* Dark-mode surfaces (navy/slate/teal base) */
@@ -35,5 +42,12 @@
     --tl-accent: var(--tl-coral);
     --tl-accent-alt: var(--tl-teal);
     --tl-border: rgba(244, 239, 229, 0.15);
+    --tl-chrome-bg: var(--tl-slate);
+    --tl-choice-bg: #1d4258;
+    --tl-choice-bg-hover: #235067;
+    --tl-feedback-ok: #173f2a;
+    --tl-feedback-bad: #4a221a;
+    --tl-bar-bg: #1d4258;
+    --tl-heading: var(--tl-cream);
   }
 }

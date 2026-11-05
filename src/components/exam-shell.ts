@@ -10,6 +10,7 @@ import {
 import { ProgressStore } from '../lib/progress.js';
 import { nextSchedule } from '../lib/sm2.js';
 import { contentIdentityFromQuestion } from '../lib/ident.js';
+import { sectionTitle, subelementTitle } from '../data/exam-banks.js';
 import './question-card.js';
 import './chapter-list.js';
 import './book-cta.js';
@@ -79,8 +80,8 @@ export class ExamShell extends LitElement {
     :host {
       display: block;
       min-height: 100vh;
-      background: var(--tl-cream, #f4efe5);
-      color: var(--tl-navy, #173847);
+      background: var(--tl-bg, #f4efe5);
+      color: var(--tl-text, #173847);
       font-family: var(--font-body, system-ui, sans-serif);
     }
 
@@ -114,7 +115,7 @@ export class ExamShell extends LitElement {
 
     .bank-chooser {
       margin-left: auto;
-      background: var(--tl-slate, #255665);
+      background: var(--tl-chrome-bg, #255665);
       color: var(--tl-cream, #f4efe5);
       border: 1px solid rgba(244, 239, 229, 0.3);
       border-radius: 8px;
@@ -126,7 +127,7 @@ export class ExamShell extends LitElement {
       display: flex;
       gap: 6px;
       padding: 10px 22px;
-      background: var(--tl-slate, #255665);
+      background: var(--tl-chrome-bg, #255665);
     }
 
     button.tab {
@@ -142,8 +143,8 @@ export class ExamShell extends LitElement {
     button.tab:hover { background: rgba(244, 239, 229, 0.16); }
     button.tab:focus-visible { outline: 3px solid var(--tl-coral, #f58a6a); outline-offset: 2px; }
     button.tab[aria-selected='true'] {
-      background: var(--tl-cream, #f4efe5);
-      color: var(--tl-navy, #173847);
+      background: var(--tl-choice-bg, #1d4258);
+      color: var(--tl-accent-alt, #f58a6a);
       font-weight: 600;
     }
 
@@ -153,8 +154,36 @@ export class ExamShell extends LitElement {
       padding: 20px 22px 60px;
     }
 
+    .home-head {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 14px;
+    }
+
+    .ready {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      background: var(--tl-surface, #fff);
+      border: 1px solid var(--tl-border, #e5e0d5);
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-family: var(--font-mono, monospace);
+    }
+
+    .ready-num {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--tl-teal, #2f5e5b);
+    }
+
+    .ready-label {
+      font-size: 11px;
+      color: var(--tl-text-muted, #6b7280);
+    }
+
     .placeholder {
-      color: var(--tl-slate, #255665);
+      color: var(--tl-text-muted, #255665);
       font-size: 14px;
     }
 
@@ -165,7 +194,7 @@ export class ExamShell extends LitElement {
       margin-bottom: 12px;
       font-family: var(--font-mono, monospace);
       font-size: 12px;
-      color: var(--tl-slate, #255665);
+      color: var(--tl-text-muted, #255665);
     }
 
     button.back {
@@ -175,7 +204,7 @@ export class ExamShell extends LitElement {
       padding: 6px 14px;
       font-size: 13px;
       cursor: pointer;
-      color: var(--tl-navy, #173847);
+      color: var(--tl-text, #173847);
     }
     button.back:focus-visible { outline: 3px solid var(--tl-teal, #2f5e5b); outline-offset: 2px; }
 
@@ -183,7 +212,7 @@ export class ExamShell extends LitElement {
       text-align: center;
       padding: 30px 10px;
       font-size: 15px;
-      color: var(--tl-slate, #255665);
+      color: var(--tl-text-muted, #255665);
       background: var(--tl-surface, #fff);
       border-radius: 12px;
       border: 1px solid var(--tl-border, #e5e0d5);
