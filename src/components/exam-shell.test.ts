@@ -3,6 +3,7 @@ import { fixture, html } from '@open-wc/testing';
 import syllabusData from '../data/us-tech-syllabus.json';
 import '../components/exam-shell.js';
 import type { ExamShell } from '../components/exam-shell.js';
+import { ProgressStore } from '../lib/progress.js';
 
 describe('exam-shell', () => {
   it('renders the brand bar (logo + full name) and the bank chooser with v1 banks', async () => {
@@ -13,6 +14,100 @@ describe('exam-shell', () => {
     const options = [...el.shadowRoot!.querySelectorAll('select.bank-chooser option')] as HTMLOptionElement[];
     expect(options.map(o => o.value)).toEqual(expect.arrayContaining(['us-tech', 'ca-basic']));
     expect(el.shadowRoot!.querySelector('img.brand-logo')).not.toBeNull();
+  });
+
+  describe('exam-bank selection persistence', () => {
+    it('restores the stored bank on mount (ca-basic stored → the CA home renders, untouched other banks)', async () => {
+      const store = new FreshStore();
+      // this is a "reload": the store (IndexedDB) carries the last selection
+      await store.setSetting('bank', 'ca-basic');
+      const el = await fixture<ExamShell>(html`<exam-shell></exam-shell>`);
+      el.progress = store;
+      await el.updateComplete;
+      await new Promise(r => setTimeout(r, 30));
+      await el.updateComplete;
+      expect(el.shadowRoot!.textContent).toContain('ISED Basic question bank'); // restored, not US
+      const cl = await waitForChapterList(el);
+      expect((cl as any).blocks[0].id).toBe('B-001');
+      // and its own progress is independent: an unrelated us-tech record stays stored
+      const { US_TECH } = await import('../data/exam-banks.js');
+      const { contentIdentityFromQuestion } = await import('../lib/ident.js');
+      await store.recordAnswer(contentIdentityFromQuestion(US_TECH[0]!), false, 1000);
+      const ca = await store.recordsFor('ca-basic');
+      const us = await store.recordsFor('us-tech');
+      expect(us.map(r => r.identity)).toContain(contentIdentityFromQuestion(US_TECH[0]!));
+      expect(ca).toHaveLength(0);
+      void cl;
+    });
+
+    it('falls back to the default when the stored selection is invalid, then keeps working', async () => {
+      const store = new FreshStore();
+      await store.setSetting('bank', 'ca-bogus');
+      const el = await fixture<ExamShell>(html`<exam-shell></exam-shell>`);
+      el.progress = store;
+      await el.updateComplete;
+      await new Promise(r => setTimeout(r, 30));
+      await el.updateComplete;
+      expect(el.shadowRoot!.textContent).toContain('NCVEC Technician pool'); // untouched default
+      const cl = await waitForChapterList(el);
+      expect((cl as any).blocks[0].id).toBe('T1');
+    });
+
+    it('falls back safely when the preference store is inaccessible', async () => {
+      const store = new FreshStore();
+      store.breakSettings = true;
+      const el = await fixture<ExamShell>(html`<exam-shell></exam-shell>`);
+      el.progress = store;
+      await el.updateComplete;
+      await new Promise(r => setTimeout(r, 30));
+      await el.updateComplete;
+      expect(el.shadowRoot!.textContent).toContain('NCVEC Technician pool');
+      const cl = await waitForChapterList(el);
+      expect((cl as any).blocks.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('storing a choice happens the moment the chooser is used (survives a reload)', async () => {
+      const store = new FreshStore();
+      const el = await fixture<ExamShell>(html`<exam-shell></exam-shell>`);
+      el.progress = store;
+      await el.updateComplete;
+      await new Promise(r => setTimeout(r, 30));
+      await el.updateComplete;
+      const sel = el.shadowRoot!.querySelector('select.bank-chooser') as HTMLSelectElement;
+      sel.value = 'ca-advanced';
+      sel.dispatchEvent(new Event('change'));
+      await el.updateComplete;
+      await new Promise(r => setTimeout(r, 30));
+      expect(await store.getSetting<string>('bank', '')).toBe('ca-advanced');
+      expect(el.shadowRoot!.textContent).toContain('ISED Advanced question bank');
+      // simulate a reload with the same store
+      const el2 = await fixture<ExamShell>(html`<exam-shell></exam-shell>`);
+      (el2 as any).progress = store;
+      await el2.updateComplete;
+      await new Promise(r => setTimeout(r, 40));
+      await el2.updateComplete;
+      expect(el2.shadowRoot!.textContent).toContain('ISED Advanced question bank');
+    });
+
+    it('a restore resolving after a manual pick never clobbers the manual pick', async () => {
+      const store = new FreshStore();
+      await store.setSetting('bank', 'ca-basic');
+      // hold getSetting in the air until the test lets it go
+      let releaseGet: (v: string) => void = () => {};
+      const gate = new Promise<string>(res => { releaseGet = res; });
+      (store as any).getSetting = async (_k: string, _f: unknown) => gate as unknown as string;
+      const el = await fixture<ExamShell>(html`<exam-shell></exam-shell>`);
+      el.progress = store;
+      await el.updateComplete;
+      const sel = el.shadowRoot!.querySelector('select.bank-chooser') as HTMLSelectElement;
+      sel.value = 'us-extra';
+      sel.dispatchEvent(new Event('change'));
+      await el.updateComplete;
+      releaseGet('ca-basic'); // the pending restore resolves AFTER the manual pick
+      await el.updateComplete;
+      await new Promise(r => setTimeout(r, 30));
+      expect(el.shadowRoot!.textContent).toContain('NCVEC Extra pool'); // manual pick stands
+    });
   });
 
   it('Practice tab lists the bank sections (chapter list); book CTA links present', async () => {
@@ -95,4 +190,19 @@ async function waitForChapterList(el: ExamShell): Promise<any> {
     await el.updateComplete;
   }
   throw new Error('chapter-list with sections never rendered');
+}
+
+/** A real ProgressStore on a fresh named DB for full test isolation. */
+class FreshStore extends ProgressStore {
+  breakSettings = false;
+  constructor() {
+    super(`test-shell-persist-${Math.random().toString(36).slice(2)}`);
+  }
+  override getSetting<T>(_key: string, fallback: T): Promise<T> {
+    if (this.breakSettings) return Promise.reject(new Error('settings store inaccessible'));
+    return super.getSetting(_key, fallback);
+  }
+  async recordsFor(bank: string) {
+    return this.bankRecords(bank);
+  }
 }

@@ -61,6 +61,10 @@ export class ExamShell extends LitElement {
   @state() uiLang: Lang = getLang();
 
   private unsubLang?: () => void;
+  /** Set the moment the user picks a bank; a pending restore then no-ops. */
+  private bankTouched = false;
+  /** The store the last restore attempt used (a replaced store re-triggers it). */
+  private restoredFrom: ProgressStore | null = null;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -69,8 +73,17 @@ export class ExamShell extends LitElement {
       // the tile titles localize in refreshSectionStats' block map
       void this.refreshSectionStats();
     });
+    // restore the last selection (a sync-free, storage-safe "remember me")
+    void this.restoreBank();
   }
 
+  /**
+   * The chosen exam outlives the page: stored in the progress store's
+   * settings (IndexedDB, same place progress lives). Restores asynchronously
+   * after mount; anything missing/stale/inaccessible stays on the default
+   * bank without breaking anything, and a manual pick always wins over a
+   * restore that resolves late.
+   */
   disconnectedCallback(): void {
     this.unsubLang?.();
     this.unsubLang = undefined;
@@ -82,8 +95,32 @@ export class ExamShell extends LitElement {
     return bankDisplay(this.bank, this.uiLang);
   }
 
+  /**
+   * The chosen exam outlives the page: stored in the progress store's
+   * settings (IndexedDB, same place progress lives). Restores asynchronously
+   * after mount; anything missing/stale/inaccessible stays on the default
+   * bank without breaking anything, and a manual pick always wins over a
+   * restore that resolves late.
+   */
+  private async restoreBank(): Promise<void> {
+    this.restoredFrom = this.progress;
+    let stored = '';
+    try {
+      stored = await this.progress.getSetting<string>('bank', '');
+    } catch {
+      return; // settings store inaccessible: default bank, untouched
+    }
+    const pick = BANKS.find(b => b.id === stored);
+    if (pick && !this.bankTouched) {
+      this.bank = pick;
+    }
+  }
+
   updated(changed: Map<string, unknown>): void {
     super.updated(changed);
+    // a store swapped in after mount (tests, or the shell wiring) re-runs
+    // the restore exactly once per store instance
+    if (this.progress !== this.restoredFrom) void this.restoreBank();
     // Real per-section progress: the chapter list must never show fake zeros
     // once the user has studied. Load on every change that can move a record
     // (bank switch, view back to the pick screen) — recordAnswer fires after
@@ -333,8 +370,12 @@ export class ExamShell extends LitElement {
           .value="${this.bank.id}"
           @change="${(e: Event) => {
             const pick = BANKS.find(b => b.id === (e.target as HTMLSelectElement).value) ?? BANKS[0]!;
+            this.bankTouched = true;
             this.bank = pick;
             this.view = { kind: 'practice-pick' };
+            void this.progress.setSetting('bank', pick.id).catch(() => {
+              /* a full store can't record the choice: the session still works */
+            });
           }}"
         >
           ${BANKS.map(b => html`<option value="${b.id}">${b.titleFr && this.uiLang === 'fr' ? b.titleFr : b.title}</option>`)}
