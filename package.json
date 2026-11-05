@@ -5,6 +5,14 @@
   "description": "Offline-first FOSS study trainer for US and Canadian amateur radio license exams. Part of the Tartanleaf RadioBook series.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gregweir/HamExamTrainer"
+  },
+  "homepage": "https://radiobook.ca/trainer/",
+  "bugs": {
+    "url": "https://github.com/gregweir/HamExamTrainer/issues"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

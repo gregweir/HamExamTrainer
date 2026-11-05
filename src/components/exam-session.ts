@@ -121,6 +121,12 @@ export class ExamSession extends LitElement {
       font-weight: 700;
     }
 
+    .unanswered {
+      margin-top: 6px;
+      color: #c74e31;
+      font-size: 13px;
+    }
+
     table.breakdown {
       margin: 18px auto 0;
       border-collapse: collapse;
@@ -259,7 +265,6 @@ export class ExamSession extends LitElement {
       position: 0,
       questionIdentities: sample.map(identityOf),
       answers: new Array(sample.length).fill(null),
-      budgetSeconds: null,
     };
     this.session = session;
     this.started = true;
@@ -294,6 +299,15 @@ export class ExamSession extends LitElement {
   private async submit(): Promise<void> {
     const s = this.session;
     if (!s) return;
+    // Real-exam discipline: an unfinished paper submits with a warning, and
+    // anything unanswered grades as incorrect.
+    const unanswered = s.answers.filter(a => a === null).length;
+    if (unanswered > 0) {
+      const proceed = window.confirm(
+        `Submit with ${unanswered} unanswered? Unanswered questions count as incorrect.`,
+      );
+      if (!proceed) return;
+    }
     this.submitted = true;
     await this.store?.clearExamSession(s.bank);
   }
@@ -352,25 +366,31 @@ export class ExamSession extends LitElement {
   private renderVerdict() {
     const bank = this.bank!;
     const s = this.session!;
+    const total = s.questionIdentities.length;
     const sectionRows: Record<string, { right: number; total: number }> = {};
     let right = 0;
-    let graded = 0;
+    let unanswered = 0;
     s.answers.forEach((a, idx) => {
       const identity = s.questionIdentities[idx]!;
       const q = this.questions().find(bq => identityOf(bq) === identity);
-      if (!q || a === null) return;
+      if (a === null) {
+        // unanswered = not counted as correct — but it already sits in `total`
+        unanswered += 1;
+        return;
+      }
+      if (!q) return; // the question left the bank; it still counts as attempted-incorrect in `total`
       const isRight = a === q.correctIndex;
       if (isRight) right += 1;
-      graded += 1;
       const row = (sectionRows[q.section] ??= { right: 0, total: 0 });
       row.total += 1;
       if (isRight) row.right += 1;
     });
-    const v = ExamSession.verdict(bank, right, graded);
+    const v = ExamSession.verdict(bank, right, total);
     return html`
       <div class="verdict" role="status">
         <div class="big ${v.passed ? 'pass' : 'fail'}">${Math.round(v.percent)}% — ${v.passed ? 'PASS' : 'FAIL'}</div>
-        <div>${right} of ${graded} graded correct · the bar: pass ${bank.passPercent}%${bank.honoursPercent ? `, Honours ${bank.honoursPercent}%` : ''}</div>
+        <div>${right} of ${total} correct · the bar: pass ${bank.passPercent}%${bank.honoursPercent ? `, Honours ${bank.honoursPercent}%` : ''}</div>
+        ${unanswered > 0 ? html`<div class="unanswered">${unanswered} unanswered — counted as incorrect</div>` : nothing}
         ${v.honours ? html`<div class="honours">Honours — ${Math.round(v.percent)}% ≥ ${bank.honoursPercent}%</div>` : nothing}
         <table class="breakdown">
           <tr><th>Section</th><th>Correct</th><th>Of</th></tr>

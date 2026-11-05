@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { fixture, html } from '@open-wc/testing';
 import '../components/exam-session.js';
 import { ExamSession } from '../components/exam-session.js';
-import { BANKS } from '../data/exam-banks.js';
+import { CA_BASIC, BANKS, US_TECH, type ExamQuestion } from '../data/exam-banks.js';
+import { contentIdentityFromQuestion } from '../lib/ident.js';
 
 /** Deterministic sample test through the component's static sampler. */
 describe('exam-session sampling + verdict (pure logic)', () => {
@@ -34,6 +35,104 @@ describe('exam-session sampling + verdict (pure logic)', () => {
     expect(h.honours).toBe(true); // exact 80% earns Honours
     const below = ExamSession.verdict(bank, 69, 100);
     expect(below.passed).toBe(false);
+  });
+});
+
+/**
+ * The verdict counts the WHOLE paper: any question the user left unanswered
+ * is not dropped from the denominator — it grades as incorrect (real exam
+ * behaviour: no reward for never answering).
+ */
+describe('exam-session verdict counts unanswered as incorrect', () => {
+  async function verdictFor(bankId: 'us-tech' | 'ca-basic', opts: {
+    answeredCorrect: number;
+    answeredWrong: number;
+    total: number;
+  }): Promise<{ el: any; text: string }> {
+    const pool: ExamQuestion[] = bankId === 'us-tech' ? US_TECH : (CA_BASIC as unknown as ExamQuestion[]);
+    const store = new StubStore();
+    const el: any = await fixture(html`<exam-session .store="${store}" .bankId="${bankId}"></exam-session>`);
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 20));
+    await el.updateComplete;
+    // craft a session of `total` questions, the first `answered` ones answered
+    const identityOf = (q: ExamQuestion) => contentIdentityFromQuestion(q);
+    const sample = ExamSession.sampleQuestions(
+      BANKS.find(b => b.id === bankId)!,
+      1234,
+    ).slice(0, opts.total);
+    const answers: (number | null)[] = [];
+    let a = 0;
+    for (let i = 0; i < sample.length; i++) {
+      if (a < opts.answeredCorrect) {
+        answers.push(sample[i]!.correctIndex);
+        a += 1;
+      } else if (a < opts.answeredCorrect + opts.answeredWrong) {
+        answers.push((sample[i]!.correctIndex + 1) % sample[i]!.choices.length);
+        a += 1;
+      } else {
+        answers.push(null); // left unanswered
+      }
+    }
+    el.session = {
+      bank: bankId,
+      startedAt: Date.now() - 60_000,
+      savedAt: Date.now(),
+      position: 0,
+      questionIdentities: sample.map(identityOf),
+      answers,
+    };
+    el.started = true;
+    el.submitted = true;
+    await el.updateComplete;
+    return { el, text: el.shadowRoot.querySelector('.verdict').textContent };
+  }
+
+  it('US Tech: 25 answered (all right) of 35 → 71% FAIL, and the paper shows 4 unanswered', async () => {
+    const { el, text } = await verdictFor('us-tech', { answeredCorrect: 25, answeredWrong: 0, total: 35 });
+    expect(text).toContain('71%');
+    expect(text).toContain('FAIL');
+    expect(text.toLowerCase()).toContain('10 unanswered');
+    void el;
+  });
+
+  it('US Tech: 30/35 all right → 85% PASS (the unanswered 5 sit in the denominator)', async () => {
+    const { text } = await verdictFor('us-tech', { answeredCorrect: 30, answeredWrong: 0, total: 35 });
+    expect(text).toContain('85%');
+    expect(text).toContain('PASS');
+    expect(text.toLowerCase()).toContain('5 unanswered');
+  });
+
+  it('wrong answers and unanswered both sit in the denominator: 26 right, 4 wrong, 5 blank of 35 → 74% PASS at the bar', async () => {
+    const { text } = await verdictFor('us-tech', { answeredCorrect: 26, answeredWrong: 4, total: 35 });
+    expect(text).toContain('74%');
+    expect(text).toContain('PASS');
+    expect(text.toLowerCase()).toContain('5 unanswered');
+  });
+
+  it('submitting with unanswered questions asks first (confirm), and a decline keeps the session', async () => {
+    const confirm = vi.fn(() => false);
+    (window as any).confirm = confirm;
+    const store = new StubStore();
+    const el: any = await fixture(html`<exam-session .store="${store}" .bankId="${'us-tech'}"></exam-session>`);
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 20));
+    await el.updateComplete;
+    (el.shadowRoot.querySelector('button.primary') as HTMLButtonElement).click();
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 20));
+    await el.updateComplete;
+    // answer nothing — 35 unanswered left
+    const submit = [...el.shadowRoot.querySelectorAll('button.primary')]
+      .find(b => b.textContent === 'Submit exam') as HTMLButtonElement;
+    submit!.click();
+    await el.updateComplete;
+    expect(confirm).toHaveBeenCalled();
+    const [msg] = confirm.mock.calls[0]! as unknown as [string];
+    expect(msg).toContain('unanswered');
+    // declined: still running, session intact
+    expect(el.shadowRoot.querySelector('question-card')).not.toBeNull();
+    expect(Object.keys(store.sessions).length).toBe(1);
   });
 });
 

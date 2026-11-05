@@ -6,7 +6,8 @@ import type { ExamQuestion } from '../data/exam-banks.js';
  * One study question: text, optional figure, four choices, instant feedback
  * (choice + explanation + references), then a Next affordance. In exam mode
  * the shell renders this element with `examMode` — feedback is suppressed
- * and selection is stored, not revealed.
+ * and selection is stored, not revealed. Set `hideNext` where the host has
+ * its own advancing UI (review-session) — otherwise a dead Next button shows.
  *
  * Events:
  *  - 'answered' detail { correct: boolean, choiceIndex: number } (once per question)
@@ -17,6 +18,8 @@ export class QuestionCard extends LitElement {
   @property({ type: Object }) question: ExamQuestion | null = null;
   @property({ type: Boolean }) examMode = false;
   @property({ type: Boolean }) nextDisabled = false;
+  /** Host has its own advancing UI — never render the card's own Next button. */
+  @property({ type: Boolean }) hideNext = false;
 
   @state() private pickedIndex: number | null = null;
   @state() private advanceRequested = false;
@@ -221,7 +224,7 @@ export class QuestionCard extends LitElement {
           ` : nothing}
           ${q.references.length ? html`<div class="refs">Reference: ${q.references.join(', ')}</div>` : nothing}
         </div>
-        ${this.advanceRequested ? nothing : html`
+        ${this.advanceRequested || this.hideNext ? nothing : html`
           <button class="next" ?disabled="${this.nextDisabled}" @click="${() => this.requestNext()}">Next question →</button>
         `}
       ` : nothing}

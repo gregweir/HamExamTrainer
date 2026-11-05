@@ -20,7 +20,6 @@ import {
   type CaExamQuestion,
   type ExamBankId,
   type ExamQuestion,
-  PARKED_BANKS,
   US_TECH,
 } from '../exam-banks';
 
@@ -190,12 +189,15 @@ describe('US parser — russolsen NCVEC pools', () => {
     }
   });
 
-  it('resolves each declared figure to an existing raw file and an emitted public copy', () => {
+  it('resolves each declared figure to an existing raw file — and, for SHIPPED banks, an emitted public copy', () => {
     const bankDirs: Record<string, string> = {
       'us-tech': 'data/raw/us/technician-2026-2030',
       'us-general': 'data/raw/us/general-2023-2027',
       'us-extra': 'data/raw/us/extra-2024-2028',
     };
+    // Parked banks' figures are unbundled: only us-tech (the shipped bank with
+    // figures) keeps a public/ copy so the precache stays lean.
+    expect(BANKS.map((b) => b.id)).toEqual(['us-tech', 'ca-basic']);
     for (const [bank, questions] of [
       ['us-tech', US_TECH],
       ['us-general', emitted('us-general')],
@@ -208,7 +210,11 @@ describe('US parser — russolsen NCVEC pools', () => {
         expect(existsSync(join(repo, bankDirs[bank]!, file!))).toBe(true);
         // figure path is bundle-relative: public/<figure> is the served file.
         expect(q.figure).toMatch(/^figures\//);
-        expect(existsSync(join(repo, 'public', q.figure!))).toBe(true);
+        if (bank === 'us-tech') {
+          expect(existsSync(join(repo, 'public', q.figure!))).toBe(true);
+        } else {
+          expect(existsSync(join(repo, 'public', 'figures', bank))).toBe(false);
+        }
       }
     }
   });
@@ -315,18 +321,14 @@ describe('bank registry', () => {
     expect(basic.bookCta.href).toBe('https://radiobook.ca/b3');
   });
 
-  it('carries exam rules for the parsed-but-parked banks', () => {
-    expect(PARKED_BANKS.map((b) => b.id)).toEqual(['us-general', 'us-extra', 'ca-advanced']);
-    expect(PARKED_BANKS[0]!.examLength).toBe(35);
-    expect(PARKED_BANKS[0]!.passPercent).toBe(74);
-    expect(PARKED_BANKS[1]!.examLength).toBe(50);
-    expect(PARKED_BANKS[1]!.passPercent).toBe(74);
-    expect(PARKED_BANKS[2]!.examLength).toBe(50);
-    expect(PARKED_BANKS[2]!.passPercent).toBe(70);
-    expect(PARKED_BANKS[2]!.honoursPercent).toBeUndefined();
-    for (const b of PARKED_BANKS) {
-      expect(b.sections.length).toBeGreaterThan(0);
-      expect(BANKS.map((s) => s.id)).not.toContain(b.id);
+  it('carries flip-on rules for the parsed-but-parked banks (json on disk, NOT bundled)', () => {
+    // Parked banks ship no static import: the parsed JSONs stay on disk
+    // (validated against the raw pools by validatePools) until a later
+    // release adds one import + one BANKS entry.
+    const shipped = BANKS.map((b) => b.id);
+    for (const parked of ['us-general', 'us-extra', 'ca-advanced']) {
+      expect(shipped).not.toContain(parked);
+      expect(existsSync(join(repo, EMITTED_PATHS[parked]!))).toBe(true);
     }
   });
 });

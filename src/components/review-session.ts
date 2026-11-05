@@ -136,6 +136,7 @@ export class ReviewSession extends LitElement {
       ${q ? html`
         <question-card
           .question="${q}"
+          .hideNext="${true}"
           @answered="${(e: CustomEvent) => {
             // immutable: Lit does not observe indexed array writes
             const next = [...this.answeredCorrectly];

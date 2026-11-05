@@ -6,7 +6,10 @@
 //   - CA verbatim byte-check (normalized rows rebuild the raw TXT byte-for-byte)
 //   - CA EN/FR correct-answer pairing against the raw fields
 //   - figure integrity (declared figures exist raw + emitted)
-//   - registry consistency (BANKS + PARKED_BANKS counts/sections match the data)
+//   - registry consistency (BANKS counts/sections match the data; parked banks
+//     counts stay honest for their flip-on)
+//   - content-identity uniqueness per bank (same-stem variants with different
+//     choices must stay distinct; only true duplicate rows may merge)
 //
 // CLI usage:  npx vite-node --script scripts/validate-pools.ts   (exit 1 on any error)
 
@@ -17,7 +20,7 @@ import {
   BANKS,
   type CaExamQuestion,
   type ExamQuestion,
-  PARKED_BANKS,
+  type BankDefinition,
 } from '../src/data/exam-banks';
 import {
   caRawLine,
@@ -25,6 +28,10 @@ import {
   parseCaBank,
 } from './parse-ca';
 import { parseUsBank, USAuthoritativeSources, type RawUsQuestion } from './parse-us';
+import {
+  contentIdentityFromQuestion,
+  normalizeQuestionText,
+} from '../src/lib/ident';
 
 export interface PoolValidationReport {
   ok: boolean;
@@ -59,9 +66,43 @@ function checkUniqueId(bank: string, questions: ExamQuestion[], errors: string[]
   }
 }
 
+/**
+ * Content identities (see src/lib/ident.ts) must be unique per bank: a
+ * collision merges unrelated questions' user progress. The one permissible
+ * collision is a TRUE duplicate row — same normalized stem, same choice set,
+ * same correct answer text, differing only in the presented choice order
+ * (today: ca-basic B-001-019-004/-006). Anything else fails the bank.
+ */
+function checkUniqueIdentity(bank: string, questions: ExamQuestion[], errors: string[]): void {
+  const groups = new Map<string, ExamQuestion[]>();
+  for (const q of questions) {
+    const identity = contentIdentityFromQuestion(q);
+    const list = groups.get(identity) ?? [];
+    list.push(q);
+    groups.set(identity, list);
+  }
+  for (const [identity, group] of groups) {
+    if (group.length === 1) continue;
+    const correctText = (q: ExamQuestion) =>
+      normalizeQuestionText(q.choices[q.correctIndex] ?? '');
+    const trueDupe =
+      new Set(group.map((q) => normalizeQuestionText(q.question))).size === 1 &&
+      new Set(group.map((q) => q.choices.map(normalizeQuestionText).sort().join('\u001f'))).size === 1 &&
+      new Set(group.map(correctText)).size === 1;
+    if (trueDupe) continue;
+    errors.push(
+      `${bank}: content-identity collision ${identity} merges DISTINCT questions ` +
+        group.map((q) => q.id).join('+'),
+    );
+  }
+}
+
 export function validatePools(): PoolValidationReport {
   const errors: string[] = [];
   const counts: Array<{ bank: string; questions: number }> = [];
+  // Shipped banks bundle their figures under public/ (so they precache);
+  // PARKED banks keep only the raw figure files on disk.
+  const shippedIds = new Set(BANKS.map((b) => b.id));
 
   // --- US banks ------------------------------------------------------------
   for (const source of USAuthoritativeSources) {
@@ -77,7 +118,10 @@ export function validatePools(): PoolValidationReport {
       if (q.choices.length !== 4 || q.correctIndex < 0 || q.correctIndex > 3) {
         errors.push(`${q.bank} ${q.id}: answer-index out of range`);
       }
-      if (q.figure && !existsSync(join('public', q.figure))) {
+      if (q.figure && !existsSync(join(source.dir, q.figure.split('/').pop()!))) {
+        errors.push(`${q.bank} ${q.id}: figure ${q.figure} not found raw`);
+      }
+      if (q.figure && shippedIds.has(source.bank) && !existsSync(join('public', q.figure))) {
         errors.push(`${q.bank} ${q.id}: figure ${q.figure} not found under public/`);
       }
     }
@@ -152,6 +196,18 @@ export function validatePools(): PoolValidationReport {
   }
 
   // --- Registry consistency ------------------------------------------------
+  //
+  // PARKED banks are no longer bundled (their JSONs stay on disk, still
+  // validated above against the raw pools), so their registry rules live here
+  // as the flip-on source. When a bank ships (one import + one BANKS entry in
+  // src/data/exam-banks.ts), delete its row here.
+  const bankRules: { id: string; questionCount: number; examLength: number }[] = [
+    { id: 'us-tech', questionCount: 409, examLength: 35 },
+    { id: 'ca-basic', questionCount: 984, examLength: 100 },
+    { id: 'us-general', questionCount: 423, examLength: 35 },
+    { id: 'us-extra', questionCount: 599, examLength: 50 },
+    { id: 'ca-advanced', questionCount: 549, examLength: 50 },
+  ];
   const bankData: Record<string, ExamQuestion[]> = {
     'us-tech': emitBank<ExamQuestion[]>('us-tech'),
     'us-general': emitBank<ExamQuestion[]>('us-general'),
@@ -159,20 +215,25 @@ export function validatePools(): PoolValidationReport {
     'ca-basic': emitBank<CaExamQuestion[]>('ca-basic'),
     'ca-advanced': emitBank<CaExamQuestion[]>('ca-advanced'),
   };
-  for (const bank of [...BANKS, ...PARKED_BANKS]) {
-    const data = bankData[bank.id]!;
-    if (data.length !== bank.questionCount) {
-      errors.push(`registry ${bank.id}: questionCount ${bank.questionCount} != data ${data.length}`);
+  for (const rule of bankRules) {
+    const data = bankData[rule.id]!;
+    if (data.length !== rule.questionCount) {
+      errors.push(`registry ${rule.id}: questionCount ${rule.questionCount} != data ${data.length}`);
     }
-    const sections = [...new Set(data.map((q) => q.section))];
-    if (sections.join('|') !== bank.sections.join('|')) {
-      errors.push(`registry ${bank.id}: section list does not match the data`);
-    }
-    if (data.some((q) => q.bank !== bank.id)) {
-      errors.push(`registry ${bank.id}: rows tagged with foreign bank ids`);
-    }
-    if (bank.examLength > bank.questionCount) {
-      errors.push(`registry ${bank.id}: examLength ${bank.examLength} exceeds ${bank.questionCount}`);
+    if (shippedIds.has(rule.id as BankDefinition['id'])) {
+      // full registry rules for shipped banks come straight from BANKS
+      const bank = BANKS.find((b) => b.id === rule.id)!;
+      const sections = [...new Set(data.map((q) => q.section))];
+      if (sections.join('|') !== bank.sections.join('|')) {
+        errors.push(`registry ${bank.id}: section list does not match the data`);
+      }
+      if (data.some((q) => q.bank !== bank.id)) {
+        errors.push(`registry ${bank.id}: rows tagged with foreign bank ids`);
+      }
+      if (bank.examLength > bank.questionCount) {
+        errors.push(`registry ${bank.id}: examLength ${bank.examLength} exceeds ${bank.questionCount}`);
+      }
+      checkUniqueIdentity(bank.id, data, errors);
     }
   }
 

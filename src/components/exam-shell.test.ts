@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { fixture, html } from '@open-wc/testing';
 import '../components/exam-shell.js';
 import type { ExamShell } from '../components/exam-shell.js';
@@ -17,15 +17,16 @@ describe('exam-shell', () => {
   it('Practice tab lists the bank sections (chapter list); book CTA links present', async () => {
     const el = await fixture<ExamShell>(html`<exam-shell></exam-shell>`);
     await el.updateComplete;
-    expect(el.shadowRoot!.querySelector('chapter-list')).not.toBeNull();
+    const cl = await waitForChapterList(el);
+    expect(cl).not.toBeNull();
     expect(el.shadowRoot!.querySelector('book-cta')).not.toBeNull();
   });
 
   it('starting a section shows the question card with that bank+section’s first question', async () => {
     const el = await fixture<ExamShell>(html`<exam-shell></exam-shell>`);
     await el.updateComplete;
-    const cl = el.shadowRoot!.querySelector('chapter-list')!;
-    cl.dispatchEvent(new CustomEvent('section-start', { detail: { section: 'T1A' } }));
+    const cl = await waitForChapterList(el);
+    cl!.dispatchEvent(new CustomEvent('section-start', { detail: { section: 'T1A' } }));
     await el.updateComplete;
     const card = el.shadowRoot!.querySelector('question-card')!;
     expect((card as any).question?.section).toBe('T1A');
@@ -39,4 +40,53 @@ describe('exam-shell', () => {
     await el.updateComplete;
     expect(((card as any).question as { id: string }).id).not.toBe('T1A01');
   });
+
+  it('the chapter list shows REAL per-section progress from the store (no fake zeros)', async () => {
+    const el = await fixture<ExamShell>(html`<exam-shell></exam-shell>`);
+    await el.updateComplete;
+    const { US_TECH } = await import('../data/exam-banks.js');
+    const { contentIdentityFromQuestion } = await import('../lib/ident.js');
+    // isolate this test's records: a fresh, uniquely-named store
+    // (the component's default store shares its db across test fixtures)
+    const { ProgressStore } = await import('../lib/progress.js');
+    const store = new ProgressStore(`test-shell-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    el.progress = store;
+    await waitForChapterList(el);
+    // seed the store: two real T1B questions studied, one of them correctly
+    const t1b = US_TECH.filter(q => q.section === 'T1B');
+    await store.recordAnswer(contentIdentityFromQuestion(t1b[0]!), true, 1000);
+    await store.recordAnswer(contentIdentityFromQuestion(t1b[1]!), false, 1000);
+    // return to the pick view (view object changes → the shell reloads stats)
+    el.view = { kind: 'practice-pick' };
+    // the stats load is async — wait for it to reflect the store
+    const readT1B = async (): Promise<any> => {
+      await el.updateComplete;
+      const cl = el.shadowRoot!.querySelector('chapter-list');
+      return (cl as any)?.sections?.find((s: any) => s.id === 'T1B');
+    };
+    let section: any;
+    for (let i = 0; i < 60; i++) {
+      section = await readT1B();
+      if (section?.studied === 2) break;
+      await new Promise(r => setTimeout(r, 10));
+    }
+    expect(section, 'T1B row carries store-derived stats').toBeTruthy();
+    expect(section.studied, 'T1B studied count comes from the store').toBe(2);
+    expect(section.correct).toBe(1);
+    // untouched sections still read as new
+    const cl = el.shadowRoot!.querySelector('chapter-list');
+    const t1a = (cl as any).sections?.find((s: any) => s.id === 'T1A');
+    expect(t1a.studied).toBe(0);
+  });
 });
+
+/** The section stats load asynchronously — wait until the chapter list carries data. */
+async function waitForChapterList(el: ExamShell): Promise<any> {
+  for (let i = 0; i < 60; i++) {
+    const cl = el.shadowRoot!.querySelector('chapter-list');
+    if (cl && (((cl as any).sections?.length ?? 0) > 0)) return cl;
+    await new Promise(r => setTimeout(r, 10));
+    await el.updateComplete;
+  }
+  throw new Error('chapter-list with sections never rendered');
+}

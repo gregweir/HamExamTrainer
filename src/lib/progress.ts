@@ -36,7 +36,6 @@ export interface ExamSession {
   position: number; // index into questionIdentities the user is on
   questionIdentities: string[];
   answers: (number | null)[]; // chosen choice index per question
-  budgetSeconds: number | null; // optional soft timer budget
 }
 
 export interface ExportBundle {
@@ -70,19 +69,20 @@ export class ProgressStore {
     return this.db;
   }
 
+  /** Wipe this database outright. Works before any open (no prior get() needed). */
   async reset(): Promise<void> {
     if (this.db) {
       this.db.close();
       this.db = null;
       this.opening = null;
-      if (typeof indexedDB !== 'undefined' && indexedDB.deleteDatabase) {
-        await new Promise<void>((resolve) => {
-          const req = indexedDB.deleteDatabase(this.dbName);
-          req.onsuccess = () => resolve();
-          req.onerror = () => resolve();
-          req.onblocked = () => resolve();
-        });
-      }
+    }
+    if (typeof indexedDB !== 'undefined' && indexedDB.deleteDatabase) {
+      await new Promise<void>((resolve) => {
+        const req = indexedDB.deleteDatabase(this.dbName);
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+        req.onblocked = () => resolve();
+      });
     }
   }
 
@@ -115,6 +115,13 @@ export class ProgressStore {
       .filter(r => r.identity.startsWith(bank + ':') && r.dueAt <= now)
       .sort((a, b) => a.dueAt - b.dueAt)
       .slice(0, limit);
+  }
+
+  /** Every stored record for one bank (identity keys are "<bank>:..."), for aggregation. */
+  async bankRecords(bank: string): Promise<ProgressRecord[]> {
+    const db = await this.get();
+    return ((await db.getAll('records')) as ProgressRecord[])
+      .filter(r => r.identity.startsWith(bank + ':'));
   }
 
   async saveExamSession(session: ExamSession): Promise<void> {

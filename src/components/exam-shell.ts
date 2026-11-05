@@ -15,6 +15,7 @@ import './chapter-list.js';
 import './book-cta.js';
 import './review-session.js';
 import './exam-session.js';
+import type { SectionStat } from './chapter-list.js';
 
 type Tab = 'practice' | 'review' | 'exam';
 type View =
@@ -38,6 +39,41 @@ export class ExamShell extends LitElement {
   @state() bank: BankDefinition = BANKS[0]!;
   @state() tab: Tab = 'practice';
   @state() view: View = { kind: 'practice-pick' };
+  /** Per-section progress for the chapter list (loaded from the store, async). */
+  @state() sectionStats: SectionStat[] = [];
+
+  updated(changed: Map<string, unknown>): void {
+    super.updated(changed);
+    // Real per-section progress: the chapter list must never show fake zeros
+    // once the user has studied. Load on every change that can move a record
+    // (bank switch, view back to the pick screen) — recordAnswer fires after
+    // leaving the pick view, so re-entering it is the refresh point.
+    if (
+      changed.has('bank') ||
+      (changed.has('view') && this.view.kind === 'practice-pick')
+    ) {
+      void this.refreshSectionStats();
+    }
+  }
+
+  private async refreshSectionStats(): Promise<void> {
+    const bank = this.bank;
+    if (!bank) return;
+    const questions = bankData[bank.id] ?? [];
+    const sectionOf = new Map<string, string>(questions.map(q => [contentIdentityFromQuestion(q), q.section]));
+    const totals = new Map<string, SectionStat>(
+      bank.sections.map(id => [id, { id, total: questions.filter(q => q.section === id).length, studied: 0, correct: 0 }]),
+    );
+    const records = await this.progress.bankRecords(bank.id);
+    for (const r of records) {
+      const stat = totals.get(sectionOf.get(r.identity) ?? '');
+      if (!stat) continue;
+      stat.studied += 1;
+      if (r.correctCount > 0) stat.correct += 1;
+    }
+    // ignore a stale load (the bank changed while awaiting)
+    if (this.bank === bank) this.sectionStats = bank.sections.map(id => totals.get(id)!);
+  }
 
   static styles = css`
     :host {
@@ -198,7 +234,7 @@ export class ExamShell extends LitElement {
         ${this.tab === 'practice' ? this.renderPractice() : this.tab === 'review' ? html`
           <review-session
             .store="${this.progress}"
-            .bank="${this.bank.id === 'ca-basic-honours' ? 'ca-basic' : this.bank.id}"
+            .bank="${this.bank.id}"
             .resolveQuestion="${(identity: string) => this.resolveQuestion(identity)}"
           ></review-session>
         ` : html`
@@ -218,14 +254,10 @@ export class ExamShell extends LitElement {
   private renderPractice(): unknown {
     const v = this.view;
     if (v.kind === 'practice-pick') {
-      const sections = this.bank.sections.map(id => ({
-        id,
-        total: (bankData[this.bank.id] ?? []).filter(q => q.section === id).length,
-        studied: 0,
-        correct: 0,
-      }));
+      // sectionStats load asynchronously from the store — while empty (no
+      // data yet) the chapter list renders nothing: never fake zeros.
       return html`<chapter-list
-        .sections="${sections}"
+        .sections="${this.sectionStats}"
         @section-start="${(e: CustomEvent) => {
           const section = e.detail.section;
           this.view = {

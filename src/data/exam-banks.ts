@@ -4,13 +4,13 @@
 // (docs/specs/2026-11-05-tartanleaf-ham-exam-trainer-design.md) and is produced
 // byte-for-byte by scripts/parse-us.ts and scripts/parse-ca.ts.
 
-import caAdvancedData from './banks/ca-advanced.json';
 import caBasicData from './banks/ca-basic.json';
-import usGeneralData from './banks/us-general.json';
 import usTechData from './banks/us-tech.json';
-import usExtraData from './banks/us-extra.json';
 
-/** Bank ids, mirroring the spec's union. */
+/**
+ * Bank ids, mirroring the spec's union. Only the SHIPPED banks may appear in
+ * BANKS below; the parked ids exist so the type stays stable for the flip-on.
+ */
 export type ExamBankId =
   | 'us-tech'
   | 'us-general'
@@ -55,7 +55,7 @@ export interface BankDefinition {
   id: ExamBankId;
   title: string;
   subtitle: string;
-  questionCount: number;
+  questionCount: number; // questions in the bank
   examLength: number; // questions per mock exam (all banks draw section-distributed samples)
   passPercent: number; // pass mark in whole percent (e.g. 74 = 74%)
   honoursPercent?: number; // optional second bar (CA Basic: 80% earns the Honours certificate)
@@ -67,13 +67,6 @@ export interface BankDefinition {
 export const US_TECH = usTechData as unknown as ExamQuestion[];
 /** Canadian Basic (ISED), EN-only view of the bilingual rows. */
 export const CA_BASIC = caBasicData as unknown as CaExamQuestion[];
-
-/** US General (2023–2027), parsed from NCVEC. */
-export const US_GENERAL = usGeneralData as unknown as ExamQuestion[];
-/** US Extra (2024–2028), parsed from NCVEC. */
-export const US_EXTRA = usExtraData as unknown as ExamQuestion[];
-/** Canadian Advanced (ISED), EN-only view of the bilingual rows. */
-export const CA_ADVANCED = caAdvancedData as unknown as CaExamQuestion[];
 
 /** Section list in first-appearance (syllabus) order, derived from the data itself. */
 const sectionsOf = (questions: ExamQuestion[]): string[] => [
@@ -117,40 +110,24 @@ export const BANKS: BankDefinition[] = [
 ];
 
 /**
- * Parsed, validated, pipeline-ready banks that are parked out of the shipped
- * registry until a later release flips them on (plan "Parked" list). Their
- * definitions carry the full exam-rule data so the simulator is
- * exam-agnostic from day one.
+ * PARKED banks — parsed and validated but NOT bundled.
+ *
+ * The parsed JSONs stay on disk (src/data/banks/us-general.json,
+ * us-extra.json, ca-advanced.json) where scripts/validate-pools.ts still
+ * checks them offline against the raw pools; only their static imports were
+ * dropped so the shipped entry chunk (and therefore the service-worker
+ * precache) carries exclusively the SHIPPED banks' questions.
+ *
+ * Flipping one on at a later release is exactly two lines:
+ *   1. one static import (e.g. `import usGeneralData from './banks/us-general.json';`)
+ *   2. one BANKS entry copied from the table below.
+ *
+ * Their exam-rule data, kept as the flip-on source (exam rules are the real
+ * published jurisdiction rules: US 35 questions at 74%; Extra 50 at 74%; the
+ * CA Advanced bank is expected to be re-written by ISED in 2026 — a re-base
+ * is a pipeline re-run, not a registry change):
+ *
+ *   us-general   : NCVEC General 2023–2027     · count 423 · 35 exam · 74%
+ *   us-extra     : NCVEC Extra 2024–2028       · count 599 · 50 exam · 74%
+ *   ca-advanced  : ISED Advanced bank          · count 549 · 50 exam · 70%
  */
-export const PARKED_BANKS: BankDefinition[] = [
-  {
-    id: 'us-general',
-    title: 'US General',
-    subtitle: 'NCVEC General pool, 2023–2027 · 35-question exam, 74% to pass',
-    questionCount: 423,
-    examLength: 35,
-    passPercent: 74,
-    sections: sectionsOf(US_GENERAL),
-    bookCta: { label: 'Read RadioBook 3', href: 'https://radiobook.ca/b3' },
-  },
-  {
-    id: 'us-extra',
-    title: 'US Extra',
-    subtitle: 'NCVEC Extra pool, 2024–2028 · 50-question exam, 74% to pass',
-    questionCount: 599,
-    examLength: 50,
-    passPercent: 74,
-    sections: sectionsOf(US_EXTRA),
-    bookCta: { label: 'Read RadioBook 3', href: 'https://radiobook.ca/b3' },
-  },
-  {
-    id: 'ca-advanced',
-    title: 'Canadian Advanced',
-    subtitle: 'ISED Advanced question bank · 50-question exam, 70% to pass',
-    questionCount: 549,
-    examLength: 50,
-    passPercent: 70,
-    sections: sectionsOf(CA_ADVANCED),
-    bookCta: { label: 'Read RadioBook 3', href: 'https://radiobook.ca/b3' },
-  },
-];

@@ -48,7 +48,7 @@ describe('ProgressStore', () => {
   it('saves, lists and loads resumable exam sessions', async () => {
     await store.saveExamSession({
       bank: 'ca-basic', startedAt: 100, savedAt: 200, position: 12,
-      questionIdentities: ['x', 'y', 'z'], answers: [1, 2, 3], budgetSeconds: null,
+      questionIdentities: ['x', 'y', 'z'], answers: [1, 2, 3],
     });
     const s = await store.loadExamSession('ca-basic');
     expect(s?.position).toBe(12);

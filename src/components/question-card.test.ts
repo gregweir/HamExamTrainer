@@ -88,6 +88,19 @@ describe('question-card', () => {
     await el.updateComplete;
     expect(el.shadowRoot!.textContent).not.toContain('97.1(b)');
   });
+
+  it('hideNext suppresses the card’s own Next button (host has its own advancing UI)', async () => {
+    const el = await fixture<QuestionCard>(html`
+      <question-card .question="${baseQ}" .hideNext="${true}"></question-card>
+    `);
+    await el.updateComplete;
+    const buttons = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('button.choice')];
+    buttons[0]!.click();
+    await el.updateComplete;
+    // answered, feedback shown, but NO dead Next button
+    expect(el.shadowRoot!.textContent).toContain('Not quite');
+    expect(el.shadowRoot!.querySelector('button.next')).toBeNull();
+  });
 });
 
 describe('book-cta', () => {

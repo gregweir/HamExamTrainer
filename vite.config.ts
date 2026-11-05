@@ -25,7 +25,14 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Precache = the app shell, every SHIPPED bank's chunk (the bank data
+        // rides the entry chunks) and every figure emitted into dist (today:
+        // us-tech's). PARKED banks are deliberately absent from the build.
         globPatterns: ['**/*.{js,css,html,ico,jpg,png,svg,woff2}'],
+        // Guard against a stray oversized asset ballooning the precache.
+        maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
+        // Offline navigations to any /trainer/ subpath fall back to the shell.
+        navigateFallback: 'index.html',
       },
     }),
   ],
