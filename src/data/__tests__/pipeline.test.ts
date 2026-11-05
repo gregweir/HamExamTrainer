@@ -18,13 +18,16 @@ import {
   BANKS,
   CA_ADVANCED,
   CA_BASIC,
+  bankBlock,
   type BankDefinition,
   type CaExamQuestion,
   type ExamBankId,
   type ExamQuestion,
+  subsectionTitle,
   US_GENERAL,
   US_TECH,
 } from '../exam-banks';
+import sectionNames from '../section-names-ca.json';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..', '..');
@@ -323,6 +326,26 @@ describe('bank registry', () => {
     expect(by('ca-advanced').bookCta.href).toBe('https://radiobook.ca/b5');
   });
 
+});
+
+describe('ISED UI title metadata', () => {
+  it('covers every CA subsection and block id in both banks, no leftovers', () => {
+    const names = sectionNames as unknown as Record<string, { blocks: Record<string, string>; subsections: Record<string, string> }>;
+    for (const [bankId, data] of Object.entries({ 'ca-basic': CA_BASIC, 'ca-advanced': CA_ADVANCED })) {
+      const subs = [...new Set((data as ExamQuestion[]).map(q => q.section))];
+      const blocks = [...new Set(subs.map(s => s.slice(0, 5)))];
+      const { blocks: namedBlocks, subsections: namedSubs } = names[bankId]!;
+      for (const id of blocks) expect(namedBlocks[id], `${bankId} block ${id}`).toBeTruthy();
+      for (const id of subs) expect(namedSubs[id], `${bankId} subsection ${id}`).toBeTruthy();
+      for (const id of Object.keys(namedBlocks)) expect(blocks, `${bankId} block leftover ${id}`).toContain(id);
+      for (const id of Object.keys(namedSubs)) expect(subs, `${bankId} subsection leftover ${id}`).toContain(id);
+    }
+  });
+
+  it('US banks get no CA-derived titles (their syllabus names already carry them)', () => {
+    expect(subsectionTitle('us-tech', 'T0A')).toBeNull();
+    expect(bankBlock('us-tech', 'T0A-01')).toBeNull();
+  });
 });
 
 describe('validatePools', () => {

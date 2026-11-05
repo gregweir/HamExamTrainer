@@ -79,6 +79,14 @@ export class ChapterList extends LitElement {
       color: var(--tl-text-muted, #255665);
     }
 
+    .s-title {
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.25;
+      color: var(--tl-text, #173847);
+      margin: 0 0 8px;
+    }
+
     .progress-track {
       height: 4px;
       border-radius: 2px;
@@ -130,6 +138,7 @@ export class ChapterList extends LitElement {
                   <span class="section-id">${s.id}</span>
                   <span class="state ${state.replace(' ', '-')}">${state}</span>
                 </div>
+                ${s.title ? html`<div class="s-title">${s.title}</div>` : nothing}
                 <div class="progress-track" role="progressbar" aria-valuenow="${s.studied}" aria-valuemax="${s.total}">
                   <div class="progress-fill" style="width: ${Math.round(covered * 100)}%"></div>
                 </div>

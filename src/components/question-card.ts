@@ -87,14 +87,23 @@ export class QuestionCard extends LitElement {
       flex: 0 0 auto;
     }
 
+    /* The feedback fills are light paper in both themes, so the text on them
+       must go dark explicitly — 'inherit' is cream under data-mode="dark". */
     button.choice.right {
       border-color: #2f8f4e;
       background: #eaf6ee;
+      color: var(--tl-navy, #173847);
     }
 
     button.choice.wrong {
       border-color: #c74e31;
       background: #f9ece8;
+      color: var(--tl-navy, #173847);
+    }
+
+    button.choice.right .key,
+    button.choice.wrong .key {
+      color: var(--tl-slate, #255665);
     }
 
     button.choice:disabled {

@@ -15,12 +15,13 @@ import { initialThemeMode, cycleThemeMode } from '../lib/theme.js';
 import { ProgressStore } from '../lib/progress.js';
 import { nextSchedule } from '../lib/sm2.js';
 import { contentIdentityFromQuestion } from '../lib/ident.js';
-import { bankBlock, sectionTitle, subelementTitle } from '../data/exam-banks.js';
+import { bankBlock, sectionTitle, subsectionTitle, subelementTitle } from '../data/exam-banks.js';
 import './question-card.js';
 import './chapter-list.js';
 import './book-cta.js';
 import './review-session.js';
 import './exam-session.js';
+import './install-dialog.js';
 import type { SubjectBlock, SubsectionStat } from './chapter-list.js';
 
 type Tab = 'practice' | 'review' | 'exam';
@@ -89,9 +90,10 @@ export class ExamShell extends LitElement {
       this.blocks = bank.sections.reduce<SubjectBlock[]>((acc, id) => {
         const blockId = id.slice(0, 6);
         const title = bankBlock(bank.id, blockId) ?? sectionTitle(bank.id, id);
+        const stat = { ...totals.get(id)!, title: subsectionTitle(bank.id, id) ?? undefined };
         const last = acc[acc.length - 1];
-        if (last && last.id === blockId) last.subsections.push(totals.get(id)!);
-        else acc.push({ id: blockId, title, subsections: [totals.get(id)!] });
+        if (last && last.id === blockId) last.subsections.push(stat);
+        else acc.push({ id: blockId, title, subsections: [stat] });
         return acc;
       }, []);
     }
@@ -272,6 +274,11 @@ export class ExamShell extends LitElement {
           aria-label="Switch between light and dark mode"
           @click="${function () { document.documentElement.dataset.mode = cycleThemeMode(); }}"
         >◐</button>
+        <button
+          class="mode-btn install-btn"
+          aria-label="How to install this app on your device"
+          @click="${() => this.renderRoot.querySelector('install-dialog')?.show()}"
+        >Install</button>
         <select
           class="bank-chooser"
           aria-label="Choose an exam"
@@ -316,6 +323,7 @@ export class ExamShell extends LitElement {
         .bookHref="${this.bank.bookCta.href}"
         .bookLabel="${this.bank.bookCta.label}"
       ></book-cta>
+      <install-dialog></install-dialog>
     `;
   }
 

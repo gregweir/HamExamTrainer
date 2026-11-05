@@ -86,13 +86,23 @@ const sectionsOf = (questions: ExamQuestion[]): string[] => [
 
 /** The official NCVEC syllabus names (public domain); US banks only. */
 const usTechGroups = (syllabus as { groups: Record<string, string>; subelements: Record<string, string> });
-/** Subject-block titles for the ISED banks (derived from the questions as UI metadata; the bank text itself ships verbatim). */
-const caBlockNames = (blockNamesCa as { 'ca-basic': Record<string, string>; 'ca-advanced': Record<string, string> });
+interface CaSectionNames {
+  blocks: Record<string, string>;
+  subsections: Record<string, string>;
+}
+/** Subject-block and subsection titles for the ISED banks (derived from the questions as UI metadata; the bank text itself ships verbatim). */
+const caNames = (blockNamesCa as { 'ca-basic': CaSectionNames; 'ca-advanced': CaSectionNames });
 
 /** The ISED exam structure: one question is drawn from each subsection on the real exam. */
 export function bankBlock(bankId: ExamBankId, subsection: string): string | null {
   if (!bankId.startsWith('ca')) return null;
-  return (caBlockNames[bankId === 'ca-basic' ? 'ca-basic' : 'ca-advanced'] as Record<string, string> | undefined)?.[subsection.slice(0, 5)] ?? null;
+  return caNames[bankId === 'ca-advanced' ? 'ca-advanced' : 'ca-basic'].blocks[subsection.slice(0, 5)] ?? null;
+}
+
+/** Readable short title for an ISED subsection (e.g. B-003-012 → "Mic gain and splatter"). */
+export function subsectionTitle(bankId: ExamBankId, subsection: string): string | null {
+  if (!bankId.startsWith('ca')) return null;
+  return caNames[bankId === 'ca-advanced' ? 'ca-advanced' : 'ca-basic'].subsections[subsection] ?? null;
 }
 /** Group titles for US General/Extra come from their syllabi; CA advanced falls back to the group id. */
 export function sectionTitle(bankId: ExamBankId, section: string): string {

@@ -7,7 +7,7 @@ const blocks = [
     id: 'B-001',
     title: 'Regulations and operating requirements',
     subsections: [
-      { id: 'B-001-001', total: 8, studied: 3, correct: 2 },
+      { id: 'B-001-001', title: 'Regulatory authority documents', total: 8, studied: 3, correct: 2 },
       { id: 'B-001-002', total: 8, studied: 0, correct: 0 },
     ],
   },
@@ -15,7 +15,7 @@ const blocks = [
     id: 'B-002',
     title: 'Operating procedures and Q signals',
     subsections: [
-      { id: 'B-002-001', total: 9, studied: 9, correct: 8 },
+      { id: 'B-002-001', title: 'Making contact on a repeater', total: 9, studied: 9, correct: 8 },
     ],
   },
 ];
@@ -30,8 +30,18 @@ describe('chapter-list', () => {
     const rows = [...el.shadowRoot.querySelectorAll('button.section-row')];
     expect(rows.length).toBe(3);
     expect(el.shadowRoot.textContent).toContain('B-001-001');
+    expect(el.shadowRoot.textContent).toContain('Regulatory authority documents');
     expect(el.shadowRoot.textContent).toContain('3/8 studied');
     expect(el.shadowRoot.textContent.toLowerCase()).toContain('in progress');
+  });
+
+  it('omits the title line for subsections without one (US banks)', async () => {
+    const el = await fixture<any>(html`<chapter-list .blocks="${blocks}"></chapter-list>`);
+    await el.updateComplete;
+    const rows = [...el.shadowRoot.querySelectorAll('button.section-row')];
+    // B-001-002 carries no title: exactly one .s-title line in the first block
+    expect(rows[0]!.querySelectorAll('.s-title').length).toBe(1);
+    expect(rows[1]!.querySelectorAll('.s-title').length).toBe(0);
   });
 
   it('dispatches section-start with the chosen subsection id', async () => {
