@@ -6,8 +6,9 @@ import { resolve } from 'node:path';
  * The precache promise, as it actually ships:
  *
  *  - the app shell, the CSS and every SHIPPED bank's chunk are PRECACHED —
- *    the bank question data rides the shipped entry chunk, so a first install
- *    is fully offline for both shipped banks (US Tech + CA Basic).
+ *    the bank question data rides the shipped entry chunks, so a first install
+ *    is fully offline for all SHIPPED banks (US Tech/General/Extra + CA
+ *    Basic/Advanced today).
  *  - every figure EMITTED INTO DIST is precached (today only the shipped
  *    banks' figures are emitted; the parked banks' figures are not even
  *    copied, so the precache stays lean).
