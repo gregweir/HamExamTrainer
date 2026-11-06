@@ -6,7 +6,7 @@
 
 **Architecture:** Vite + Lit + TypeScript, same stack family as the suite. Data: a fetch/parse/validate pipeline (scripts/) emitting normalized JSON per bank from `data/raw/`. A small IndexedDB progress layer keyed by content-identity hashes + a per-pool-version id-alias map (re-base-proof). A `bank registry` module drives the UI (exam definitions carry counts/pass marks/sections). PWA: workbox-style precache of app shell + all shipped banks (JSON is small); figures lazy-but-cacheable.
 
-**Tech Stack:** Vite 7 + Lit 3 + TS + vite-plugin-pwa; vitest + @open-wc/testing; Playwright for UI verification (use the established UI verification approach).
+**Tech Stack:** Vite 7 + Lit 3 + TS + vite-plugin-pwa; vitest + @open-wc/testing; Playwright for UI verification.
 
 **Spec:** docs/specs/2026-11-05-tartanleaf-ham-exam-trainer-design.md (binding; implementation-review resolutions at the end are decisions).
 
