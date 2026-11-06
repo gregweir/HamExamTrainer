@@ -108,4 +108,18 @@ describe('pwa icons (installability)', () => {
     expect(m.icons?.length).toBeGreaterThanOrEqual(2);
     expect(m.icons.some((i: { sizes: string }) => i.sizes === '512x512')).toBe(true);
   });
+
+  it('index.html exposes the apple-touch-icon iOS needs for its Home Screen icon', () => {
+    const dist = resolve('dist');
+    if (!existsSync(resolve(dist, 'index.html'))) {
+      throw new Error('dist/index.html missing — run npm run build first');
+    }
+    // iOS Safari does NOT take the manifest icons for the Home Screen; without
+    // an explicit apple-touch-icon link it screenshots the page instead.
+    const html = readFileSync(resolve(dist, 'index.html'), 'utf8');
+    const link = html.match(/<link\s+rel="apple-touch-icon"\s+href="([^"]+)"\s*\/?>/);
+    expect(link, 'apple-touch-icon link present in the built head').not.toBeNull();
+    expect(link![1]).toBe('/trainer/pwa-192.png');
+    expect(existsSync(resolve(dist, 'pwa-192.png'))).toBe(true);
+  });
 });
