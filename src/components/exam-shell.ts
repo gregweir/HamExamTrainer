@@ -137,16 +137,31 @@ export class ExamShell extends LitElement {
     const bank = this.bank;
     if (!bank) return;
     const questions = bankData[bank.id] ?? [];
-    const sectionOf = new Map<string, string>(questions.map(q => [contentIdentityFromQuestion(q), q.section]));
+    const questionsByIdentity = new Map<string, ExamQuestion[]>();
+    for (const question of questions) {
+      const identity = contentIdentityFromQuestion(question);
+      const matches = questionsByIdentity.get(identity) ?? [];
+      matches.push(question);
+      questionsByIdentity.set(identity, matches);
+    }
     const totals = new Map<string, SubsectionStat>(
       bank.sections.map(id => [id, { id, total: questions.filter(q => q.section === id).length, studied: 0, correct: 0 }]),
     );
     const records = await this.progress.bankRecords(bank.id);
     for (const r of records) {
-      const stat = totals.get(sectionOf.get(r.identity) ?? '');
+      const matchingQuestions = questionsByIdentity.get(r.identity) ?? [];
+      const stat = totals.get(matchingQuestions[0]?.section ?? '');
       if (!stat) continue;
-      stat.studied += 1;
-      if (r.correctCount > 0) stat.correct += 1;
+      // Progress is intentionally keyed by content identity. If two official
+      // rows contain identical content, their attempts share one record. Count
+      // the attempts (capped by the number of matching official rows) so full
+      // coverage is still possible without inventing row-specific records.
+      // Records written before this logic already have `attempts`; the fallback
+      // keeps still-older compatible records visible as one studied question.
+      const attempts = Number.isFinite(r.attempts) ? Math.max(0, r.attempts) : 1;
+      const studied = Math.min(matchingQuestions.length, attempts);
+      stat.studied += studied;
+      stat.correct += Math.min(studied, Math.max(0, r.correctCount ?? 0));
     }
     // ignore a stale load (the bank changed while awaiting)
     if (this.bank === bank) {

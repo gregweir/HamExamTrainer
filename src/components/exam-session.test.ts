@@ -249,4 +249,62 @@ describe('exam-session flow', () => {
     await el.updateComplete;
     expect(el.shadowRoot.textContent).not.toContain('HONOURS');
   });
+
+  it('restores the stored selection when navigating back to an answered question', async () => {
+    const store = new StubStore();
+    const first = US_TECH[0]!;
+    const second = US_TECH[1]!;
+    store.sessions['us-tech'] = {
+      bank: 'us-tech', startedAt: 100, savedAt: 200, position: 1,
+      questionIdentities: [first, second].map(contentIdentityFromQuestion),
+      answers: [first.correctIndex, null],
+    };
+    const el: any = await fixture(html`<exam-session .store="${store}" .bankId="${'us-tech'}"></exam-session>`);
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 30));
+    await el.updateComplete;
+    const previous = [...el.shadowRoot.querySelectorAll('button.primary')]
+      .find((button: HTMLButtonElement) => button.textContent?.includes('Previous')) as HTMLButtonElement;
+    previous.click();
+    await el.updateComplete;
+    const card = el.shadowRoot.querySelector('question-card');
+    await card.updateComplete;
+    const choices = [...card.shadowRoot.querySelectorAll('button.choice')] as HTMLButtonElement[];
+    expect(choices[first.correctIndex]!.classList).toContain('picked');
+    expect(choices.every((button: HTMLButtonElement) => button.disabled)).toBe(true);
+    expect((store.sessions['us-tech'] as any).answers[0]).toBe(first.correctIndex);
+  });
+
+  it('loads the selected bank paper on A-to-B-to-A switches without losing either session', async () => {
+    const store = new StubStore();
+    const us = US_TECH[0]!;
+    const ca = CA_BASIC[0] as unknown as ExamQuestion;
+    store.sessions['us-tech'] = {
+      bank: 'us-tech', startedAt: 100, savedAt: 200, position: 0,
+      questionIdentities: [contentIdentityFromQuestion(us)], answers: [us.correctIndex],
+    };
+    store.sessions['ca-basic'] = {
+      bank: 'ca-basic', startedAt: 300, savedAt: 400, position: 0,
+      questionIdentities: [contentIdentityFromQuestion(ca)], answers: [null],
+    };
+    const el: any = await fixture(html`<exam-session .store="${store}" .bankId="${'us-tech'}"></exam-session>`);
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 30));
+    expect(el.session.bank).toBe('us-tech');
+
+    el.bankId = 'ca-basic';
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 30));
+    await el.updateComplete;
+    expect(el.session.bank).toBe('ca-basic');
+    expect(el.shadowRoot.querySelector('question-card').question.bank).toBe('ca-basic');
+
+    el.bankId = 'us-tech';
+    await el.updateComplete;
+    await new Promise(r => setTimeout(r, 30));
+    await el.updateComplete;
+    expect(el.session.bank).toBe('us-tech');
+    expect(el.session.answers[0]).toBe(us.correctIndex);
+    expect(store.sessions['ca-basic']).toBeTruthy();
+  });
 });

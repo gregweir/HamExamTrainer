@@ -22,6 +22,8 @@ export class QuestionCard extends LitElement {
   @property({ type: Boolean }) nextDisabled = false;
   /** Host has its own advancing UI — never render the card's own Next button. */
   @property({ type: Boolean }) hideNext = false;
+  /** A persisted choice supplied by a host such as a resumable mock exam. */
+  @property({ attribute: false }) selectedIndex: number | null = null;
 
   @state() private pickedIndex: number | null = null;
   @state() private advanceRequested = false;
@@ -78,6 +80,12 @@ export class QuestionCard extends LitElement {
 
     button.choice:hover:not(:disabled) {
       border-color: var(--tl-sage, #97a28a);
+    }
+
+    button.choice.picked {
+      border-color: var(--tl-teal, #2f5e5b);
+      background: var(--tl-bar-bg);
+      font-weight: 700;
     }
 
     button.choice:focus-visible {
@@ -242,6 +250,7 @@ export class QuestionCard extends LitElement {
             <button
               class="${cls}"
               ?disabled="${answered}"
+              aria-pressed="${isPicked}"
               @click="${() => this.pick(i)}"
             >
               <span class="key">${String.fromCharCode(65 + i)}</span>
@@ -296,9 +305,13 @@ export class QuestionCard extends LitElement {
   }
 
   protected willUpdate(changed: Map<string, unknown>): void {
-    // new question → clear answered state (shell provides a NEW question object)
-    if (changed.has('question') && changed.get('question') !== this.question) {
-      this.pickedIndex = null;
+    // A host-owned persisted selection is authoritative when a question is
+    // restored or navigation returns to it. Uncontrolled practice cards keep
+    // using their local pick until a new question object arrives.
+    if (changed.has('question') || changed.has('selectedIndex')) {
+      this.pickedIndex = this.selectedIndex;
+    }
+    if (changed.has('question')) {
       this.advanceRequested = false;
     }
   }

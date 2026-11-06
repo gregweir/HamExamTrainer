@@ -60,6 +60,7 @@ export class ExamSession extends LitElement {
   @state() private uiLang: Lang = getLang();
   private keyOff: (() => void) | null = null;
   private unsubLang?: () => void;
+  private loadRevision = 0;
 
   static styles = css`
     :host {
@@ -298,12 +299,40 @@ export class ExamSession extends LitElement {
   updated(changed: Map<string, unknown>): void {
     super.updated(changed);
     if (changed.has('bankId') || changed.has('store')) {
-      this.bank = BANKS.find(b => b.id === this.bankId) ?? null;
+      const bank = BANKS.find(b => b.id === this.bankId) ?? null;
+      const store = this.store;
+      const revision = ++this.loadRevision;
+      // The rendered paper belongs to the bank context. Clear the presentation
+      // immediately before asynchronously loading that bank's saved paper;
+      // the previous bank's session remains safely persisted in its own row.
+      this.bank = bank;
+      this.session = null;
+      this.started = false;
+      this.submitted = false;
+      this.attempts = [];
+      if (bank && store) void this.loadBankContext(bank, store, revision);
     }
-    // resume a saved session once the bank is known
-    if (this.bank && !this.started && !this.submitted && (changed.has('store') || changed.has('bankId'))) {
-      void this.tryResume();
-      void this.refreshAttempts();
+  }
+
+  private async loadBankContext(
+    bank: BankDefinition,
+    store: ProgressStore,
+    revision: number,
+  ): Promise<void> {
+    const [saved, attempts] = await Promise.all([
+      store.loadExamSession(bank.id),
+      store.bankAttempts(bank.id),
+    ]);
+    if (
+      revision !== this.loadRevision ||
+      this.bank !== bank ||
+      this.store !== store ||
+      this.bankId !== bank.id
+    ) return;
+    this.attempts = attempts;
+    if (saved?.bank === bank.id) {
+      this.session = saved;
+      this.started = true;
     }
   }
 
@@ -312,16 +341,6 @@ export class ExamSession extends LitElement {
     if (!bank || !this.store) return;
     const list = await this.store.bankAttempts(bank.id);
     if (this.bank === bank) this.attempts = list;
-  }
-
-  private async tryResume(): Promise<void> {
-    const bank = this.bank;
-    if (!bank || !this.store || this.started) return;
-    const saved = await this.store.loadExamSession(bank.id);
-    if (saved) {
-      this.session = saved;
-      this.started = true;
-    }
   }
 
   private questions(): ExamQuestion[] {
@@ -339,6 +358,9 @@ export class ExamSession extends LitElement {
   private async startExam(): Promise<void> {
     const bank = this.bank;
     if (!bank || !this.store) return;
+    // A click can race the initial saved-session lookup. Once the learner has
+    // explicitly started a paper, that older lookup must not replace it.
+    this.loadRevision += 1;
     const sample = ExamSession.sampleQuestions(bank, Math.floor(Math.random() * 2 ** 31));
     const session: StoredSession = {
       bank: bank.id,
@@ -491,6 +513,7 @@ export class ExamSession extends LitElement {
         <question-card
           .question="${q}"
           .examMode="${true}"
+          .selectedIndex="${s.answers[s.position] ?? null}"
           @answered="${(e: CustomEvent) => void this.answer(e.detail.choiceIndex as number)}"
         ></question-card>
         <div class="bar">

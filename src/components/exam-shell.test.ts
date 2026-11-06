@@ -23,11 +23,8 @@ describe('exam-shell', () => {
       await store.setSetting('bank', 'ca-basic');
       const el = await fixture<ExamShell>(html`<exam-shell></exam-shell>`);
       el.progress = store;
-      await el.updateComplete;
-      await new Promise(r => setTimeout(r, 30));
-      await el.updateComplete;
+      const cl = await waitForBank(el, 'ca-basic', 'B-001');
       expect(el.shadowRoot!.textContent).toContain('ISED Basic question bank'); // restored, not US
-      const cl = await waitForChapterList(el);
       expect((cl as any).blocks[0].id).toBe('B-001');
       // and its own progress is independent: an unrelated us-tech record stays stored
       const { US_TECH } = await import('../data/exam-banks.js');
@@ -45,11 +42,8 @@ describe('exam-shell', () => {
       await store.setSetting('bank', 'ca-bogus');
       const el = await fixture<ExamShell>(html`<exam-shell></exam-shell>`);
       el.progress = store;
-      await el.updateComplete;
-      await new Promise(r => setTimeout(r, 30));
-      await el.updateComplete;
+      const cl = await waitForBank(el, 'us-tech', 'T1');
       expect(el.shadowRoot!.textContent).toContain('NCVEC Technician pool'); // untouched default
-      const cl = await waitForChapterList(el);
       expect((cl as any).blocks[0].id).toBe('T1');
     });
 
@@ -58,11 +52,8 @@ describe('exam-shell', () => {
       store.breakSettings = true;
       const el = await fixture<ExamShell>(html`<exam-shell></exam-shell>`);
       el.progress = store;
-      await el.updateComplete;
-      await new Promise(r => setTimeout(r, 30));
-      await el.updateComplete;
+      const cl = await waitForBank(el, 'us-tech', 'T1');
       expect(el.shadowRoot!.textContent).toContain('NCVEC Technician pool');
-      const cl = await waitForChapterList(el);
       expect((cl as any).blocks.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -70,22 +61,17 @@ describe('exam-shell', () => {
       const store = new FreshStore();
       const el = await fixture<ExamShell>(html`<exam-shell></exam-shell>`);
       el.progress = store;
-      await el.updateComplete;
-      await new Promise(r => setTimeout(r, 30));
-      await el.updateComplete;
+      await waitForBank(el, 'us-tech', 'T1');
       const sel = el.shadowRoot!.querySelector('select.bank-chooser') as HTMLSelectElement;
       sel.value = 'ca-advanced';
       sel.dispatchEvent(new Event('change'));
-      await el.updateComplete;
-      await new Promise(r => setTimeout(r, 30));
+      await waitForBank(el, 'ca-advanced', 'A-001');
       expect(await store.getSetting<string>('bank', '')).toBe('ca-advanced');
       expect(el.shadowRoot!.textContent).toContain('ISED Advanced question bank');
       // simulate a reload with the same store
       const el2 = await fixture<ExamShell>(html`<exam-shell></exam-shell>`);
       (el2 as any).progress = store;
-      await el2.updateComplete;
-      await new Promise(r => setTimeout(r, 40));
-      await el2.updateComplete;
+      await waitForBank(el2, 'ca-advanced', 'A-001');
       expect(el2.shadowRoot!.textContent).toContain('ISED Advanced question bank');
     });
 
@@ -174,6 +160,30 @@ describe('exam-shell', () => {
     expect(result!.subsection.studied, 'T1B studied count comes from the store').toBe(2);
     expect(result!.subsection.correct).toBe(1);
   });
+
+  it('counts all official rows covered when content-identical rows share one progress record', async () => {
+    const { CA_BASIC, BANKS } = await import('../data/exam-banks.js');
+    const { contentIdentityFromQuestion } = await import('../lib/ident.js');
+    const store = new FreshStore();
+    for (const question of CA_BASIC) {
+      await store.recordAnswer(contentIdentityFromQuestion(question), true, Date.now());
+    }
+    const records = await store.recordsFor('ca-basic');
+    expect(records).toHaveLength(983);
+    expect(records.reduce((sum, record) => sum + record.attempts, 0)).toBe(984);
+
+    const el = await fixture<ExamShell>(html`<exam-shell></exam-shell>`);
+    el.progress = store;
+    (el as any).bankTouched = true;
+    el.bank = BANKS.find(bank => bank.id === 'ca-basic')!;
+    for (let i = 0; i < 60; i++) {
+      await el.updateComplete;
+      if (el.sectionStats.reduce((sum, stat) => sum + stat.studied, 0) === 984) break;
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    expect(el.sectionStats.reduce((sum, stat) => sum + stat.studied, 0)).toBe(984);
+    expect(records.find(record => record.attempts === 2)?.attempts).toBe(2);
+  });
 });
 
 const syllabus = syllabusData as { subelements: Record<string, string>; groups: Record<string, string> };
@@ -190,6 +200,18 @@ async function waitForChapterList(el: ExamShell): Promise<any> {
     await el.updateComplete;
   }
   throw new Error('chapter-list with sections never rendered');
+}
+
+/** Wait for both the selected bank and its asynchronously rebuilt chapter blocks. */
+async function waitForBank(el: ExamShell, bankId: string, firstBlock: string): Promise<any> {
+  for (let i = 0; i < 60; i++) {
+    await el.updateComplete;
+    const select = el.shadowRoot!.querySelector('select.bank-chooser') as HTMLSelectElement | null;
+    const list = el.shadowRoot!.querySelector('chapter-list') as any;
+    if (el.bank.id === bankId && select?.value === bankId && list?.blocks?.[0]?.id === firstBlock) return list;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  throw new Error(`bank ${bankId} with chapter block ${firstBlock} never rendered`);
 }
 
 /** A real ProgressStore on a fresh named DB for full test isolation. */

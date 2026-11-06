@@ -112,6 +112,25 @@ describe('question-card', () => {
     expect(el.shadowRoot!.textContent).toContain('Not quite');
     expect(el.shadowRoot!.querySelector('button.next')).toBeNull();
   });
+
+  it('renders a persisted exam selection and prevents a conflicting re-answer', async () => {
+    const el = await fixture<QuestionCard>(html`
+      <question-card
+        .question="${baseQ}"
+        .examMode="${true}"
+        .selectedIndex="${baseQ.correctIndex}"
+      ></question-card>
+    `);
+    await el.updateComplete;
+    const onAnswered = vi.fn();
+    el.addEventListener('answered', onAnswered);
+    const buttons = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('button.choice')];
+    expect(buttons[baseQ.correctIndex]!.classList).toContain('picked');
+    expect(buttons[baseQ.correctIndex]!.getAttribute('aria-pressed')).toBe('true');
+    expect(buttons.every(button => button.disabled)).toBe(true);
+    buttons[0]!.click();
+    expect(onAnswered).not.toHaveBeenCalled();
+  });
 });
 
 describe('book-cta', () => {
