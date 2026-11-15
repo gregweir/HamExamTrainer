@@ -1,5 +1,9 @@
 # Tartanleaf Ham Exam Trainer
 
+[![Validate](https://github.com/gregweir/HamExamTrainer/actions/workflows/validate.yml/badge.svg)](https://github.com/gregweir/HamExamTrainer/actions/workflows/validate.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Try the live trainer](https://img.shields.io/badge/Try_the_trainer-radiobook.ca-2ea44f)](https://radiobook.ca/trainer/)
+
 An offline-first, free and open-source study trainer for **US and Canadian
 amateur radio license exams** — the US NCVEC pools (Technician, General,
 Amateur Extra) and the ISED Canada Basic and Advanced banks.
